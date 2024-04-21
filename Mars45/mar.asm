@@ -3,9 +3,10 @@
     filename:   .asciiz "calc_log.txt"
 
     ## Array
-        arr_byte_valid:     .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '.', 'M', '^', '!', '(', ')'
-        arr_byte_operator:  .byte '+', '-', '*', '/', '^', 'M', '!', '(', ')'
-        arr_byte_number:    .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
+        # arr_byte_valid:     .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '.', 'M', '^', '!', '(', ')'
+        # arr_byte_operator:  .byte '+', '-', '*', '/', '^', 'M', '!', '(', ')'
+        # arr_byte_number:    .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
+        arr_byte_operator:  .byte '+', '-', '*', '/', '^', '!'
 
     ## String
         quit_string:        .asciiz "quit"
@@ -15,15 +16,15 @@
         ascii_exit_prompt:  .asciiz "Exiting program...!\n"
 
     ## Exception
-        exc_divide_by_zero:         .asciiz "Error: Divide by zero\n"
-        exc_inval_input:            .asciiz "Error: Invalid input\n"
-        exc_inval_expression:       .asciiz "Error: Invalid expression\n"
-        exc_inval_operator:         .asciiz "Error: Invalid operator\n"
-        exc_inval_number:           .asciiz "Error: Invalid number\n"
-        exc_inval_parenthesis:      .asciiz "Error: Invalid parenthesis\n"
-        exc_inval_factorial:        .asciiz "Error: Invalid factorial\n"
-        exc_inval_power:            .asciiz "Error: Invalid power\n"
-        exc_inval_logarithm:        .asciiz "Error: Invalid logarithm\n"
+        # exc_divide_by_zero:         .asciiz "Error: Divide by zero\n"
+        # exc_inval_input:            .asciiz "Error: Invalid input\n"
+        # exc_inval_expression:       .asciiz "Error: Invalid expression\n"
+        # exc_inval_operator:         .asciiz "Error: Invalid operator\n"
+        # exc_inval_number:           .asciiz "Error: Invalid number\n"
+        # exc_inval_parenthesis:      .asciiz "Error: Invalid parenthesis\n"
+        # exc_inval_factorial:        .asciiz "Error: Invalid factorial\n"
+        # exc_inval_power:            .asciiz "Error: Invalid power\n"
+        # exc_inval_logarithm:        .asciiz "Error: Invalid logarithm\n"
         factorial_out_of_bound:     .asciiz "Error: Factorial's argument must less than 16, got n="
     
     ## Color
@@ -44,44 +45,160 @@
     
 main:
     main_loop: # Loop and ask user to input
+        # Print "Please insert your expression: "
         jal CYAN
-        la $a0, ascii_in_prompt
+        la $a0, ascii_in_prompt     # Load address of input prompt
+        jal PRINT_STRING            # Print input prompt
+        jal RESET
+
+        # Read input from user
+        la $a0, input_string        # Load address of input buffer
+        li $a1, 100                 # Set max length of input buffer (1 space for null character)
+        jal READ_STRING_FROM_USER   # Read input from user
+
+        # 'quit' check
+        la $a0, quit_string         # Load address of quit string
+        la $a1, input_string        # Load address of user input
+        jal COMPARE_STRING          # Compare 2 strings
+        beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
+
+        # Print "Result: "
+        jal CYAN
+        la $a0, ascii_out_prompt    # Load address of output prompt
+        jal PRINT_STRING            # Print output prompt
+        jal RESET
+
+        # # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
+        # la $a0, input_string        # Load address of input buffer
+        # la $a1, filename            # Load address of the filename
+        # li $a2, 9                   # Mode 9: write only with create and append
+        # jal WRITE_TO_FILE           # Write the input string to the file
+
+        # Print input_string
+        la $a0, input_string        # Print user input
         jal PRINT_STRING
-        jal RESET
 
-        li $v0, 5
-        syscall
-        move $t0, $v0
-		
-        move $a0, $t0
-        jal FACTORIAL
-        move $t0, $v0
-
-        jal CYAN
-        la $a0, ascii_out_prompt
-        jal PRINT_STRING
-        jal RESET
-
-        jal CYAN
-        move $a0, $t0
-        jal PRINT_INT
-        jal RESET
-        
-        jal new_line
-        jal new_line
-    j main_loop                 # Jump back to the beginning of the loop
+    j main_loop   
 j END_PROGRAM
 
+### READ INPUT
 READ_STRING_FROM_USER: # nguyenpanda
     # READ_STRING_FROM_USER(buff_address = $a0, max_lenght = $a1) => void
     #   - Read a string from user
     # Parameters:
-    #   a0: Where string is located
+    #   a0: Where string is located in memory (.space)
     #   a1: Max length of string
     ##### Main function  #####
         li $v0, 8
         syscall
     jr $ra  # Return READ_STRING_FROM_USER
+
+READ_INT: # nguyenpanda
+    # READ_INT() => $v0: int
+    #   - Read an integer from user
+    ##### Main function  #####
+    li $v0, 5
+    syscall
+
+### INFIX TO POSTFIX
+IS_OPERAND: # nguyenpanda
+    # IS_OPERAND(char = $a0) => $v0: boolean
+    #   - Check if a character is an operand
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operand, 0 if not
+    ##### Init function  #####
+        addi $sp, $sp, -16  # IS_OPERAND: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = character
+        sw $t1, 12($sp)     # t1 = operator
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        li $v0, 0           # Assume that character is not an operand
+
+    ##### Main function  #####
+        li $t1, 48  # t1 = '0' (48)
+        blt $t0, $t1, __IS_OPERAND_RETURN_FALSE # If character < '0', return false
+        li $t1, 57  # t1 = '9' (57)
+        bgt $t0, $t1, __IS_OPERAND_RETURN_FALSE # If character > '9', return false
+        addi $v0, $zero, 1  # Return true
+
+    ##### Reset function #####
+    __IS_OPERAND_RETURN_FALSE:
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        addi $sp, $sp, 16
+    jr $ra  # Return IS_OPERAND
+
+IS_OPERATOR: # nguyenpanda
+    # IS_OPERATOR(char = $a0) => $v0: boolean
+    #   - Check if a character is an operator ('+', '-', '*', '/', '^', '!') or not
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operator, 0 if not
+    ##### Init function  #####
+        addi $sp, $sp, -16  # IS_OPERATOR: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = character
+        sw $t1, 12($sp)     # t1 = operator
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        li $v0, 0           # Assume that character is not an operator
+    
+    ##### Main function  #####
+        li $t1, 43  # t1 = '+' (43)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '+', return true
+        
+        li $t1, 45  # t1 = '-' (45)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '-', return true
+        
+        li $t1, 42  # t1 = '*' (42)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '*', return true
+
+        li $t1, 47  # t1 = '/' (47)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '/', return true
+
+        li $t1, 94  # t1 = '^' (94)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '^', return true
+
+        li $t1, 33  # t1 = '!' (33)
+        beq $t0, $t1, __IS_OPERATOR_RETURN_TRUE # If character is '!', return true
+    j __IS_OPERATOR_RESET
+    __IS_OPERATOR_RETURN_TRUE:
+        li $v0, 1   # Return true
+
+    ##### Reset function #####
+    __IS_OPERATOR_RESET:
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        add $sp, $sp, 16
+    jr $ra  # Return IS_OPERATOR
+
+OPERATOR_PRECEDENCE: # nguyenpanda
+    # OPERATOR_PRECEDENCE(operator = $a0) => $v0: int
+    #   - Get the precedence of an operator
+    # Parameters:
+    #   a0: Operator
+    # Return:
+    #   v0: Precedence of the operator
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+
+INFIX_TO_POSTFIX: # nguyenpanda
+    # INFIX_TO_POSTFIX(infix = $a0) => void
+    #   - Convert an infix expression to a postfix expression
+    # Parameters:
+    #   a0: Infix expression
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
 
 ### PRINT
 PRINT_STRING: # nguyenpanda
@@ -167,7 +284,7 @@ FACTORIAL: # nguyenpanda
     
     __exception_FACTORIAL:
         jal RED         # __exception_FACTORIAL
-        la $a0, factorial_out_of_bound
+        # la $a0, factorial_out_of_bound
         jal PRINT_STRING
         move $a0, $t0
         jal PRINT_INT
@@ -181,7 +298,7 @@ STRING_LENGHT: # nguyenpanda
     #   - Get the lenght of a string
     #   - Cut off the new line character and null character
     # Parameters:
-    #   $a0: Address of the string
+    #   $a0: Address of the string (argument PASS BY REFERENCE or PASS BY VALUE)
     # Return:
     #   $v0: Lenght of the string
     ##### Init function  #####
@@ -205,7 +322,7 @@ STRING_LENGHT: # nguyenpanda
             lw $ra, 8($sp)
             lw $t1, 4($sp)
             lw $t0, 0($sp)
-            addi $sp, $sp, 8
+            addi $sp, $sp, 12
     jr $ra  # Return STRING_LENGHT
 
 COMPARE_STRING: # nguyenpanda
@@ -238,6 +355,9 @@ COMPARE_STRING: # nguyenpanda
         addu $t3, $v0, $zero    # t3 = lenght(str_1)
 
         li $v0, 0               # Assume that 2 strings are not the same
+        
+        # If 2 strings have different lenght, return false
+        bne $t1, $t3, __RETURN_NOT_SAME_COMPARE_STRING
 
     ##### Main function  #####
         __loop_COMPARE_STRING:
@@ -281,8 +401,8 @@ TYPE_QUIT: # nguyenpanda
 
     j END_PROGRAM  # TYPE_QUIT
 
-WRITE_TO_FILE: # nguyenpanda
-    # WRITE_TO_FILE(message = $a0, length = $a1, filename = $a2, mode = $a3) => void
+WRITE_TO_FILE_: # nguyenpanda
+    # WRITE_TO_FILE_(message = $a0, length = $a1, filename = $a2, mode = $a3) => void
     #   - Write a message to a file, REMEMBER to check the length of the message
     # Parameters:
     #   $a0: Address of the message string
@@ -290,7 +410,7 @@ WRITE_TO_FILE: # nguyenpanda
     #   $a2: Address of the filename string
     #   $a3: Mode of the file (1 = write only with create / 9 = write only with creat and append)
     ##### Init function  #####
-        addi $sp, $sp, -16 # WRITE_TO_FILE: use 4 registers $t0, $t1, $t2, $t3
+        addi $sp, $sp, -16 # WRITE_TO_FILE_: use 4 registers $t0, $t1, $t2, $t3
         sw $t3, 12($sp)
         sw $t2, 8($sp)
         sw $t1, 4($sp)
@@ -327,6 +447,56 @@ WRITE_TO_FILE: # nguyenpanda
         lw $t1, 4($sp)
         lw $t0, 0($sp)
         addi $sp, $sp, 16
+    jr $ra  # Return WRITE_TO_FILE_
+
+WRITE_TO_FILE: # nguyenpanda
+    # WRITE_TO_FILE(message = $a0, filename = $a1, mode = $a2) => void
+    #   - Write a message to a file, without checking the length of the message
+    # Parameters:
+    #   $a0: Address of the message string
+    #   $a1: Address of the filename string
+    #   $a2: Mode of the file (1 = write only with create / 9 = write only with creat and append)
+    ##### Init function  #####
+        addi $sp, $sp, -20  # WRITE_TO_FILE: use 5 registers $t0, $t1, $t2, $t3, $ra
+        sw $ra, 16($sp)
+        sw $t3, 12($sp)
+        sw $t2, 8($sp)
+        sw $t1, 4($sp)
+        sw $t0, 0($sp)
+        move $t0, $a0       # message
+        jal STRING_LENGHT
+        addi $t1, $v0, 1    # length of the message (including null character)
+        move $t2, $a1       # filename
+        move $t3, $a2       # mode
+        
+    ##### Main function  #####
+        # Open the file
+        li $v0, 13      # syscall 13: open
+        move $a0, $a1   # filename
+        move $a1, $a2   # mode
+        li $a2, 0       # Default mode
+        syscall         
+        move $s0, $v0   # Save file descriptor to $s0
+
+        # Write message to the file
+        li $v0, 15      # syscall 15: write
+        move $a0, $s0   # File descriptor
+        move $a1, $t0   # Address of message
+        move $a2, $t1   # Length of message (including null character)
+        syscall
+
+        # Close the file
+        li $v0, 16      # syscall 16: close
+        move $a0, $s0   # File descriptor
+        syscall
+
+    ##### Reset function #####
+        lw $ra, 16($sp)
+        lw $t3, 12($sp)
+        lw $t2, 8($sp)
+        lw $t1, 4($sp)
+        lw $t0, 0($sp)
+        addi $sp, $sp, 20
     jr $ra  # Return WRITE_TO_FILE
 
 new_line: # RestingKiwi
@@ -383,3 +553,5 @@ new_line: # RestingKiwi
         li $v0, 4
         syscall
         jr $ra  # Return RESET
+
+### TEST

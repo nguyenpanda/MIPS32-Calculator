@@ -67,22 +67,20 @@ main:
         jal PRINT_STRING            # Print output prompt
         jal RESET
 
-        # Write input to file
+        # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
         la $a0, input_string        # Load address of input buffer
-        jal STRING_LENGHT           # Get the length of the input string
-        addi $v0, $v0, 1
-        move $a1, $v0               # Move the length of the input string to $a1
-        la $a2, filename            # Load address of the filename
-        li $a3, 9                   # Mode 9: write only with create and append
-        jal WRITE_TO_FILE           # Write the input string to the file
+        la $a1, filename            # Load address of the filename
+        li $a2, 9                   # Mode 9: write only with create and append
+        jal WRITE_TO_FILE_           # Write the input string to the file
 
         # Print input_string
         la $a0, input_string        # Print user input
-        jal PRINT_STRING            # Print user input
+        jal PRINT_STRING            
         jal new_line                # Print new line
     j main_loop                 # Jump back to the beginning of the loop
 j END_PROGRAM
 
+### READ INPUT
 READ_STRING_FROM_USER: # nguyenpanda
     # READ_STRING_FROM_USER(buff_address = $a0, max_lenght = $a1) => void
     #   - Read a string from user
@@ -93,6 +91,56 @@ READ_STRING_FROM_USER: # nguyenpanda
         li $v0, 8
         syscall
     jr $ra  # Return READ_STRING_FROM_USER
+
+READ_INT: # nguyenpanda
+    # READ_INT() => $v0: int
+    #   - Read an integer from user
+    ##### Main function  #####
+    li $v0, 5
+    syscall
+
+### INFIX TO POSTFIX
+IS_OPERAND: # nguyenpanda
+    # IS_OPERAND(char = $a0) => $v0: boolean
+    #   - Check if a character is an operand
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operand, 0 if not
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+
+IS_OPERATOR: # nguyenpanda
+    # IS_OPERATOR(char = $a0) => $v0: boolean
+    #   - Check if a character is an operator ('+', '-', '*', '/', '^', '!') or not
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operator, 0 if not
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+
+OPERATOR_PRECEDENCE: # nguyenpanda
+    # OPERATOR_PRECEDENCE(operator = $a0) => $v0: int
+    #   - Get the precedence of an operator
+    # Parameters:
+    #   a0: Operator
+    # Return:
+    #   v0: Precedence of the operator
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+
+INFIX_TO_POSTFIX: # nguyenpanda
+    # INFIX_TO_POSTFIX(infix = $a0) => void
+    #   - Convert an infix expression to a postfix expression
+    # Parameters:
+    #   a0: Infix expression
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
 
 ### PRINT
 PRINT_STRING: # nguyenpanda
@@ -192,7 +240,7 @@ STRING_LENGHT: # nguyenpanda
     #   - Get the lenght of a string
     #   - Cut off the new line character and null character
     # Parameters:
-    #   $a0: Address of the string
+    #   $a0: Address of the string (argument PASS BY REFERENCE or PASS BY VALUE)
     # Return:
     #   $v0: Lenght of the string
     ##### Init function  #####
@@ -216,7 +264,7 @@ STRING_LENGHT: # nguyenpanda
             lw $ra, 8($sp)
             lw $t1, 4($sp)
             lw $t0, 0($sp)
-            addi $sp, $sp, 8
+            addi $sp, $sp, 12
     jr $ra  # Return STRING_LENGHT
 
 COMPARE_STRING: # nguyenpanda
@@ -292,8 +340,8 @@ TYPE_QUIT: # nguyenpanda
 
     j END_PROGRAM  # TYPE_QUIT
 
-WRITE_TO_FILE: # nguyenpanda
-    # WRITE_TO_FILE(message = $a0, length = $a1, filename = $a2, mode = $a3) => void
+WRITE_TO_FILE_: # nguyenpanda
+    # WRITE_TO_FILE_(message = $a0, length = $a1, filename = $a2, mode = $a3) => void
     #   - Write a message to a file, REMEMBER to check the length of the message
     # Parameters:
     #   $a0: Address of the message string
@@ -301,7 +349,7 @@ WRITE_TO_FILE: # nguyenpanda
     #   $a2: Address of the filename string
     #   $a3: Mode of the file (1 = write only with create / 9 = write only with creat and append)
     ##### Init function  #####
-        addi $sp, $sp, -16 # WRITE_TO_FILE: use 4 registers $t0, $t1, $t2, $t3
+        addi $sp, $sp, -16 # WRITE_TO_FILE_: use 4 registers $t0, $t1, $t2, $t3
         sw $t3, 12($sp)
         sw $t2, 8($sp)
         sw $t1, 4($sp)
@@ -338,6 +386,56 @@ WRITE_TO_FILE: # nguyenpanda
         lw $t1, 4($sp)
         lw $t0, 0($sp)
         addi $sp, $sp, 16
+    jr $ra  # Return WRITE_TO_FILE_
+
+WRITE_TO_FILE: # nguyenpanda
+    # WRITE_TO_FILE(message = $a0, filename = $a1, mode = $a2) => void
+    #   - Write a message to a file, without checking the length of the message
+    # Parameters:
+    #   $a0: Address of the message string
+    #   $a1: Address of the filename string
+    #   $a2: Mode of the file (1 = write only with create / 9 = write only with creat and append)
+    ##### Init function  #####
+        addi $sp, $sp, -20  # WRITE_TO_FILE: use 5 registers $t0, $t1, $t2, $t3, $ra
+        sw $ra, 16($sp)
+        sw $t3, 12($sp)
+        sw $t2, 8($sp)
+        sw $t1, 4($sp)
+        sw $t0, 0($sp)
+        move $t0, $a0       # message
+        jal STRING_LENGHT
+        addi $t1, $v0, 1    # length of the message (including null character)
+        move $t2, $a1       # filename
+        move $t3, $a2       # mode
+        
+    ##### Main function  #####
+        # Open the file
+        li $v0, 13      # syscall 13: open
+        move $a0, $a1   # filename
+        move $a1, $a2   # mode
+        li $a2, 0       # Default mode
+        syscall         
+        move $s0, $v0   # Save file descriptor to $s0
+
+        # Write message to the file
+        li $v0, 15      # syscall 15: write
+        move $a0, $s0   # File descriptor
+        move $a1, $t0   # Address of message
+        move $a2, $t1   # Length of message (including null character)
+        syscall
+
+        # Close the file
+        li $v0, 16      # syscall 16: close
+        move $a0, $s0   # File descriptor
+        syscall
+
+    ##### Reset function #####
+        lw $ra, 16($sp)
+        lw $t3, 12($sp)
+        lw $t2, 8($sp)
+        lw $t1, 4($sp)
+        lw $t0, 0($sp)
+        addi $sp, $sp, 20
     jr $ra  # Return WRITE_TO_FILE
 
 new_line: # RestingKiwi

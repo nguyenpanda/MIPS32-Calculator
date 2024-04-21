@@ -67,7 +67,7 @@ def infixToPostfix(string: str, M: int):
     
     return result # (-4+1)*-8 # ((-10.2-3)*8-2/7)*2-M!*2^7)*(-1)
     # (-1)*((-4+3))-3+10*10
-    
+
 def infixToPostfix_1(string: str, M: int):
     stack: list = []
     result: str = ''
