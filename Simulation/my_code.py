@@ -42,7 +42,7 @@ def infixToPostfix(string: str, M: int):
         if (isOperand(char)):
             result += char
         elif char == 'M':
-            result += str(M)
+            result += 'M'
         elif char == ' ':
             continue
         elif char == '(':
