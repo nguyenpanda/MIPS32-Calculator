@@ -1,0 +1,2 @@
+M,true_result,expression,expected postfix,got
+10,98,(-1)*((-4+3))-3+10*10,-1 -4 3 + * 3 - 10 10 * +,true,FALSE

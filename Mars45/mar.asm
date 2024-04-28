@@ -1,33 +1,38 @@
 # spim .asm
 .data
-    filename:   .asciiz "calc_log.txt"
+    ## Variables
+        # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
+        stack:              .space 208 # Stack
+        
+        input_string:       .space 104 # MAX LENGTH OF INPUT STRING IS 100
+        postfix_string:     .space 304 # MAX LENGTH OF POSTFIX STRING IS 300
 
-    ## Array
-        # arr_byte_valid:     .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '.', 'M', '^', '!', '(', ')'
-        # arr_byte_operator:  .byte '+', '-', '*', '/', '^', 'M', '!', '(', ')'
-        # arr_byte_number:    .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
-        arr_byte_operator:  .byte '+', '-', '*', '/', '^', '!'
+    ### file    
+        filename:   .asciiz "calc_log.txt"
 
     ## String
+        ascii_check_point:  .asciiz "Check point: "
+        ascii_new_char:     .asciiz "\033[1;92m----------------------------\033[0m\n"
+        ascii_ddd:          .asciiz "\t---\n"
+        ascii_num_buffer:   .asciiz "\tNumber buffer: "
+        ascii_for_char:     .asciiz "Getting info for: "
         quit_string:        .asciiz "quit"
-        ascii_out_prompt:   .asciiz "Result: "
+        ascii_out_prompt:   .asciiz "Input: "
+        ascii_postfix:      .asciiz "Postfix: "
         ascii_in_prompt:    .asciiz "Please insert your expression: "
         ascii_quit_prompt:  .asciiz "You have typed 'quit'.\n"
         ascii_exit_prompt:  .asciiz "Exiting program...!\n"
+        ascii_stack_top:	.asciiz "<-TOP (Length="
+        ascii_write_result: .asciiz ","
 
     ## Exception
         # exc_divide_by_zero:         .asciiz "Error: Divide by zero\n"
-        # exc_inval_input:            .asciiz "Error: Invalid input\n"
-        # exc_inval_expression:       .asciiz "Error: Invalid expression\n"
-        # exc_inval_operator:         .asciiz "Error: Invalid operator\n"
-        # exc_inval_number:           .asciiz "Error: Invalid number\n"
-        # exc_inval_parenthesis:      .asciiz "Error: Invalid parenthesis\n"
-        # exc_inval_factorial:        .asciiz "Error: Invalid factorial\n"
-        # exc_inval_power:            .asciiz "Error: Invalid power\n"
-        # exc_inval_logarithm:        .asciiz "Error: Invalid logarithm\n"
-        factorial_out_of_bound:     .asciiz "Error: Factorial's argument must less than 16, got n="
-        ascii_stack_overflow:   .asciiz "Stack overflow!\n"
-        ascii_stack_underflow:  .asciiz "Stack underflow!\n"
+        exc_invalid_character:          .asciiz "Error: Invalid character at position="
+        exc_inval_length_expression:    .asciiz "Error: Expression length must >= 1 or <= 100, got length="
+        exc_factorial_out_of_bound:     .asciiz "Error: Factorial's argument must less than 16, got n="
+        exc_write_to_file_invalid_mode: .asciiz "WRITE_TO_FILE only accept 'w' ($a2=1) or 'a' ($a2=9) mode, got="
+        exc_stack_overflow:             .asciiz "Stack overflow!\n"
+        exc_stack_underflow:            .asciiz "Stack underflow!\n"
     
     ## Color
         color_r: .asciiz "\033[1;91m" 	# Red color escape sequence
@@ -38,91 +43,12 @@
         color_c: .asciiz "\033[1;96m" 	# Cyan color escape sequence
         color_w: .asciiz "\033[1;97m" 	# White color escape sequence
         reset:   .asciiz "\033[0m" 	    # Reset color escape sequence
-
-    ## Variables
-    
-        # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
-        stack_test:     .word 52 # Stack for tesing
-        stack0:         .word 52 # Stack for INFIX_TO_POSTFIX
-        stack1:         .word 52 # Stack for EVALUATE_POSTFIX
-        
-        
-        input_string:   .space 101 # MAX LENGTH OF INPUT STRING IS 100
         
 .text
     .globl  main
     
 main:
-    main_loop: # Loop and ask user to input
-        j TEST_STACK
-
-        # Print "Please insert your expression: "
-        jal CYAN
-        la $a0, ascii_in_prompt     # Load address of input prompt
-        jal PRINT_STRING            # Print input prompt
-        jal RESET
-
-        # Read input from user
-        la $a0, input_string        # Load address of input buffer
-        li $a1, 100                 # Set max length of input buffer (1 space for null character)
-        jal READ_STRING_FROM_USER   # Read input from user
-
-        # 'quit' check
-        la $a0, quit_string         # Load address of quit string
-        la $a1, input_string        # Load address of user input
-        jal COMPARE_STRING          # Compare 2 strings
-        beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
-
-        # Print "Result: "
-        jal CYAN
-        la $a0, ascii_out_prompt    # Load address of output prompt
-        jal PRINT_STRING            # Print output prompt
-        jal RESET
-
-        # # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
-        # la $a0, input_string        # Load address of input buffer
-        # la $a1, filename            # Load address of the filename
-        # li $a2, 9                   # Mode 9: write only with create and append
-        # jal WRITE_TO_FILE           # Write the input string to the file
-
-        # Print input_string
-        la $a0, input_string        # Print user input
-        jal PRINT_STRING
-        
-        # Use to check if a character is an operator/operand
-        li $t0, 0                   # Index of the current character
-        li $t2, 0                   # counter of the number of operators
-        li $t3, 0                   # counter of the number of not operators
-
-        loop:
-            lb $t1, input_string($t0)   # Load character from input_string
-            addi $t0, $t0, 1            # Move to next character
-            beq $t1, $zero, out_loop    # If character is null, end loop
-            beq $t1, 10, out_loop     # If character is new line, end loop
-            move $a0, $t1               # Move character to $a0
-            jal IS_OPERATOR             # Check if character is an operator
-            beq $v0, 1, __if_operator     # If character is an operator, jump to is_operator
-            addi $t3, $t3, 1
-            j loop
-        j loop
-
-        __if_operator:
-            addi $t2, $t2, 1
-            j loop
-
-        out_loop:
-            move $a0, $t2
-            jal PRINT_INT
-
-            li $a0, '-'
-            jal PRINT_CHAR
-
-            move $a0, $t3
-            jal PRINT_INT
-
-            jal new_line
-
-    j main_loop   
+    jal TEST_MAIN
 j END_PROGRAM
 
 ### READ INPUT
@@ -133,7 +59,7 @@ READ_STRING_FROM_USER: # nguyenpanda
     #   a0: Where string is located in memory (.space)
     #   a1: Max length of string
     ##### Main function  #####
-        li $v0, 8
+        li $v0, 8   # READ_STRING_FROM_USER
         syscall
     jr $ra  # Return READ_STRING_FROM_USER
 
@@ -141,8 +67,8 @@ READ_INT: # nguyenpanda
     # READ_INT() => $v0: int
     #   - Read an integer from user
     ##### Main function  #####
-    li $v0, 5
-    syscall
+    li $v0, 5   # READ_INT
+    syscall     # Return READ_INT
 
 ### STACK
 STACK: # nguyenpanda
@@ -155,11 +81,12 @@ STACK: # nguyenpanda
     
     STACK_INIT: # nguyenpanda
         # STACK_INIT(stack_pointer $a0) => void
-        #   - Initialize the stack
+        #   - Initialize the stack by setting top_pointer to the first element and length to 0
+        #   - Noted that data in the stack won't be reset when calling this function
         # Parameters:
         #   a0: stack_pointer
         ##### Init function  #####
-            addi $sp, $sp, -8
+            addi $sp, $sp, -8 # STACK_INIT: use 2 registers $ra, $a0
             sw $ra, 0($sp)
             sw $a0, 4($sp)
             move $t0, $a0
@@ -186,7 +113,7 @@ STACK: # nguyenpanda
         #   a0: stack_pointer
         # Return:
         #   v0: address of the top_pointer 
-        move $v0, $a0
+        move $v0, $a0 # __STACK_POINTER
         jr $ra  # Return __STACK_POINTER
 
     __STACK_INSERT_ADDRESS: # nguyenpanda
@@ -196,7 +123,7 @@ STACK: # nguyenpanda
         #   a0: stack_pointer
         # Return:
         #   v0: address of the top where we can insert new element
-        lw $v0, 0($a0)
+        lw $v0, 0($a0) # __STACK_INSERT_ADDRESS
         jr $ra  # Return __STACK_INSERT_ADDRESS
 
     STACK_LENGTH: # nguyenpanda
@@ -206,7 +133,7 @@ STACK: # nguyenpanda
         #   a0: stack_pointer
         # Return:
         #   v0: length
-        lw $v0, 4($a0)
+        lw $v0, 4($a0) # STACK_LENGTH
         jr $ra  # Return STACK_LENGTH
 
     STACK_PUSH: # nguyenpanda
@@ -256,7 +183,6 @@ STACK: # nguyenpanda
             lw $t1, 16($sp)
             lw $t2, 20($sp)
             addi $sp, $sp, 24
-
         jr $ra  # Return STACK_PUSH
 
     STACK_TOP: # nguyenpanda
@@ -289,7 +215,6 @@ STACK: # nguyenpanda
             lw $a0, 4($sp)
             lw $t0, 8($sp)
             addi $sp, $sp, 12
-
         jr $ra  # Return TOP
 
     STACK_POP: # nguyenpanda
@@ -338,21 +263,71 @@ STACK: # nguyenpanda
             lw $t2, 16($sp)
             lw $t3, 20($sp)
             addi $sp, $sp, 24
-
         jr $ra  # Return STACK_POP
 
-    PRINT_STACK_CHAR:
-        # PRINT_STACK(stack_pointer $a0) => void
-        #   - Print stack contents
+    STACK_RESET:
+        # STACK_RESET(stack_pointer $a0) => void
+        #   - Reset the stack
         # Parameters:
         #   a0: stack_pointer
         ##### Init function  #####
-            addi $sp, $sp, -24
+            addi $sp, $sp, -16 # STACK_RESET: use 5 registers $ra, $a0, $t0, $t1, $t2
             sw $ra, 0($sp)
             sw $a0, 4($sp)
-            sw $t0, 8($sp)  # begin
-            sw $t1, 12($sp) # top
+            sw $t0, 8($sp)  # first element in the stack
+            sw $t1, 12($sp) # end element of the stack
 
+            move $t0, $a0
+            addiu $t0, $t0, 8
+
+            jal __STACK_INSERT_ADDRESS
+            move $t1, $v0
+
+        ##### Main function  #####
+            __loop_STACK_RESET:
+                # Check if stack.begin() == stack.top()
+                beq $t0, $t1, __end_STACK_RESET
+
+                # Reset stack contents
+                sw $zero, 0($t0)
+
+                # Move to the next element in the stack
+                addiu $t0, $t0, 4
+                j __loop_STACK_RESET
+            
+            __end_STACK_RESET:
+            
+            # Reset length
+            li $t0, 0
+            sw $t0, 4($a0)
+
+            # Reset top_pointer
+            addi $t0, $a0, 8
+            sw $t0, 0($a0)
+
+        ##### Reset function  #####
+            lw $ra, 0($sp)
+            lw $a0, 4($sp)
+            lw $t0, 8($sp)
+            lw $t1, 12($sp)
+            addi $sp, $sp, 16
+        jr $ra  # Return STACK_RESET
+
+    PRINT_STACK:
+        # PRINT_STACK(stack_pointer $a0, print_function $a1) => void
+        #   - Print stack contents
+        # Parameters:
+        #   a0: stack_pointer
+        #   a1: print_function (la $a1, <PRINT_FUNCTION>)
+        ##### Init function  #####
+            addi $sp, $sp, -24  # PRINT_STACK: use 6 registers $ra, $a0, $a1, $t0, $t1, $t2
+            sw $ra, 0($sp)
+            sw $a0, 4($sp)
+            sw $a1, 8($sp)      # print_function
+            sw $t0, 12($sp)     # begin
+            sw $t1, 16($sp)     # top
+            sw $t2, 20($sp)     # length
+            
             jal __STACK_POINTER
             move $t0, $v0
             addiu $t0, $t0, 8
@@ -360,28 +335,58 @@ STACK: # nguyenpanda
             jal __STACK_INSERT_ADDRESS
             move $t1, $v0
 
+            jal STACK_LENGTH
+            move $t2, $v0
+
         ##### Main function  #####
+            # Print vertical bar
+            li $a0, '|'
+            jal PRINT_CHAR
+        
         __loop_PRINT_STACK:
             # Check if stack.begin() == stack.top()
             beq $t0, $t1, __end_PRINT_STACK
 
             # Print stack contents
+            jal MAGENTA
             lw $a0, 0($t0)
+            jalr $a1
+            jal RESET
+
+            # Print vertical bar
+            li $a0, '|'
             jal PRINT_CHAR
 
             # Move to the next element in the stack
             addiu $t0, $t0, 4
             j __loop_PRINT_STACK
+            
+            __end_PRINT_STACK:
+        
+        	# Print TOP
+        	la $a0, ascii_stack_top
+        	jal PRINT_STRING
 
-        __end_PRINT_STACK:
-        jal new_line
+            # Print stack length
+            jal CYAN
+            move $a0, $t2
+            jal PRINT_INT
+            jal RESET
+
+            # Print )
+            li $a0, ')'
+            jal PRINT_CHAR
+
+            # Print new line
+            jal new_line
 
         ##### Reset function  #####
             lw $ra, 0($sp)
             lw $a0, 4($sp)
-            lw $t0, 8($sp)
-            lw $t1, 12($sp)
-            lw $t2, 16($sp)
+            lw $a1, 8($sp)
+            lw $t0, 12($sp)
+            lw $t1, 16($sp)
+            lw $t2, 20($sp)
             addi $sp, $sp, 24
         jr $ra  # Return PRINT_STACK
 
@@ -389,7 +394,7 @@ STACK: # nguyenpanda
         # Handle stack overflow (optional)
         # This could involve printing an error message and exiting the program.
         # For simplicity, we just halt the program here.
-        la $a0, ascii_stack_overflow
+        la $a0, exc_stack_overflow
         jal PRINT_STRING
         li $v0, 10
         syscall
@@ -398,173 +403,11 @@ STACK: # nguyenpanda
         # Handle stack underflow (optional)
         # This could involve printing an error message and exiting the program.
         # For simplicity, we just halt the program here.
-        la $a0, ascii_stack_underflow
+        la $a0, exc_stack_underflow
         jal PRINT_STRING
         li $v0, 10
         syscall
         
-### INFIX TO POSTFIX
-IS_OPERAND: # nguyenpanda
-    # IS_OPERAND(char = $a0) => $v0: boolean
-    #   - Check if a character is an operand
-    # Parameters:
-    #   a0: Character
-    # Return:
-    #   v0: 1 if character is an operand, 0 if not
-    ##### Init function  #####
-        addi $sp, $sp, -16  # IS_OPERAND: use 4 registers $ra, $a0, $t0, $t1
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-        sw $t0, 8($sp)      # t0 = character
-        sw $t1, 12($sp)     # t1 = operator
-        move $t0, $a0       # SUPPORT PASS BY REFERENCE
-        li $v0, 0           # Assume that character is not an operand
-
-    ##### Main function  #####
-        beq $t0, 46, __IS_OPERAND_RETURN_TRUE # If character is '.', return true
-        blt $t0, 48, __IS_OPERAND_RETURN_FALSE # If character < '0', return false
-        bgt $t0, 57, __IS_OPERAND_RETURN_FALSE # If character > '9', return false
-        __IS_OPERAND_RETURN_TRUE:
-            addi $v0, $zero, 1  # Return true
-
-    ##### Reset function #####
-    __IS_OPERAND_RETURN_FALSE:
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        lw $t0, 8($sp)
-        lw $t1, 12($sp)
-        addi $sp, $sp, 16
-    jr $ra  # Return IS_OPERAND
-
-IS_OPERATOR: # nguyenpanda
-    # IS_OPERATOR(operator: char = $a0) => $v0: boolean
-    #   - Check if a character is an operator ('+', '-', '*', '/', '^', '!') or not
-    # Parameters:
-    #   a0: Character
-    # Return:
-    #   v0: 1 if character is an operator, 0 if not
-    ##### Init function  #####
-        addi $sp, $sp, -16  # IS_OPERATOR: use 4 registers $ra, $a0, $t0, $t1
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-        sw $t0, 8($sp)      # t0 = character
-        sw $t1, 12($sp)     # t1 = operator
-        move $t0, $a0       # SUPPORT PASS BY REFERENCE
-        li $v0, 0           # Assume that character is not an operator
-    
-    ##### Main function  #####
-        beq $t0, 43, __IS_OPERATOR_RETURN_TRUE # If character is '+', return true
-        beq $t0, 45, __IS_OPERATOR_RETURN_TRUE # If character is '-', return true
-        beq $t0, 42, __IS_OPERATOR_RETURN_TRUE # If character is '*', return true
-        beq $t0, 47, __IS_OPERATOR_RETURN_TRUE # If character is '/', return true
-        beq $t0, 94, __IS_OPERATOR_RETURN_TRUE # If character is '^', return true
-        beq $t0, 33, __IS_OPERATOR_RETURN_TRUE # If character is '!', return true
-    j __IS_OPERATOR_RESET
-    __IS_OPERATOR_RETURN_TRUE:
-        li $v0, 1   # Return true
-
-    ##### Reset function #####
-    __IS_OPERATOR_RESET:
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        lw $t0, 8($sp)
-        lw $t1, 12($sp)
-        add $sp, $sp, 16
-    jr $ra  # Return IS_OPERATOR
-
-OPERATOR_PRECEDENCE: # nguyenpanda
-    # OPERATOR_PRECEDENCE(operator: char = $a0) => $v0: int
-    #   - Get the precedence of an operator
-    # Parameters:
-    #   a0: Operator
-    # Return:
-    #   v0: Precedence of the operator, [invalid] = -1, ['+', '-'] = 1, ['*', '/'] = 2, ['^'] = 3, ['!'] = 4
-    ##### Init function  #####
-        addi $sp, $sp, -12  # OPERATOR_PRECEDENCE: use 4 registers $ra, $a0, $t0, $t1
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-        sw $t0, 8($sp)          # t0 = operator
-        move $t0, $a0           # SUPPORT PASS BY REFERENCE
-        li $v0, -1              # Assume that operator is not valid
-
-    ##### Main function  #####
-        beq $t0, 43, __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '+', return 1
-        beq $t0, 45, __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '-', return 1
-        
-        beq $t0, 42, __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '*', return 2
-        beq $t0, 47, __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '/', return 2
-
-        beq $t0, 94, __OPERATOR_PRECEDENCE_RETURN_3 # If operator is '^', return 3
-        beq $t0, 33, __OPERATOR_PRECEDENCE_RETURN_4 # If operator is '!', return 4
-
-        j __OPERATOR_PRECEDENCE_RESET
-    ##### Return functions #####
-        __OPERATOR_PRECEDENCE_RETURN_1:
-            li $v0, 1   # Return 1
-            j __OPERATOR_PRECEDENCE_RESET
-        
-        __OPERATOR_PRECEDENCE_RETURN_2:
-            li $v0, 2   # Return 2
-            j __OPERATOR_PRECEDENCE_RESET
-
-        __OPERATOR_PRECEDENCE_RETURN_3:
-            li $v0, 3   # Return 3
-            j __OPERATOR_PRECEDENCE_RESET
-
-        __OPERATOR_PRECEDENCE_RETURN_4:
-            li $v0, 4   # Return 4
-            j __OPERATOR_PRECEDENCE_RESET
-
-    ##### Reset function #####
-        __OPERATOR_PRECEDENCE_RESET:
-            lw $ra, 0($sp)
-            lw $a0, 4($sp)
-            lw $t0, 8($sp)
-            addi $sp, $sp, 12
-    jr $ra  # Return OPERATOR_PRECEDENCE
-
-INFIX_TO_POSTFIX: # nguyenpanda
-    # INFIX_TO_POSTFIX(infix: str = $a0) => void
-    #   - Convert an infix expression to a postfix expression
-    # Parameters:
-    #   a0: Infix expression
-    ##### Init function  #####
-        addi $sp, $sp, -44  # INFIX_TO_POSTFIX: use 4 registers $ra, $a0, $t0, $t1
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-        sw $t0, 8($sp)      # t0 = input_string
-        sw $t1, 12($sp)     # t1 = operator
-        sw $t2, 16($sp)     # t2 = operand  
-        sw $t3, 20($sp)     # t3 = index of the current character
-        sw $t4, 24($sp)     # t4 = index of the current operator
-        sw $t5, 28($sp)     # t5 = index of the current operand
-        sw $t6, 32($sp)     # t6 = index of the postfix expression
-        sw $t7, 36($sp)     # t7 = index of the current operator stack
-        sw $t8, 40($sp)     # t8 = index of the current operand stack
-        sw $t9, 44($sp)     # t9 = index of the current postfix expression
-
-        move $t0, $a0       # SUPPORT PASS BY REFERENCE
-    
-        li $t1, 0           # Init operator stack
-        li $t2, 0           # Init operand stack
-        li $t3, 0           # Init index of the current character
-        li $t4, 0           # Init index of the current operator
-        li $t5, 0           # Init index of the current operand
-        li $t6, 0           # Init index of the postfix expression
-        li $t7, 0           # Init index of the current operator stack
-        li $t8, 0           # Init index of the current operand stack
-        li $t9, 0           # Init index of the current postfix expression
-    
-    ##### Main function  #####
-        
-    ##### Reset function #####
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        lw $t0, 8($sp)
-        lw $t1, 12($sp)
-        addi $sp, $sp, 16
-    jr $ra  # Return INFIX_TO_POSTFIX
-
 ### PRINT
 PRINT_STRING: # nguyenpanda
     # PRINT_STRING(string = $a0) => void
@@ -604,7 +447,6 @@ PRINT_CHAR: # nguyenpanda
         lw $ra, 0($sp)
         lw $a0, 4($sp)
         addi $sp, $sp, 8
-
     jr $ra  # Return PRINT_CHAR
 
 PRINT_INT: # nguyenpanda
@@ -627,7 +469,558 @@ PRINT_INT: # nguyenpanda
         addi $sp, $sp, 8
     jr $ra  # Return PRINT_INT
 
+### INFIX TO POSTFIX
+IS_OPERAND: # nguyenpanda
+    # IS_OPERAND(char = $a0) => $v0: boolean
+    #   - Check if a character is an operand
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operand, 0 if not
+    ##### Init function  #####
+        addi $sp, $sp, -16  # IS_OPERAND: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = character
+        sw $t1, 12($sp)     # t1 = operator
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        li $v0, 0           # Assume that character is not an operand
+
+    ##### Main function  #####
+        beq $t0, '.', __IS_OPERAND_RETURN_TRUE  # If character is '.', return true
+        beq $t0, 'M', __IS_OPERAND_RETURN_TRUE  # If character is '.', return true
+        blt $t0, '0', __IS_OPERAND_RETURN_FALSE # If character < '0', return false
+        bgt $t0, '9', __IS_OPERAND_RETURN_FALSE # If character > '9', return false
+        __IS_OPERAND_RETURN_TRUE:
+            addi $v0, $zero, 1  # Return true
+
+    ##### Reset function #####
+    __IS_OPERAND_RETURN_FALSE:
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        addi $sp, $sp, 16
+    jr $ra  # Return IS_OPERAND
+
+IS_OPERATOR: # nguyenpanda
+    # IS_OPERATOR(operator: char = $a0) => $v0: boolean
+    #   - Check if a character is an operator ('+', '-', '*', '/', '^', '!') or not
+    # Parameters:
+    #   a0: Character
+    # Return:
+    #   v0: 1 if character is an operator, 0 if not
+    ##### Init function  #####
+        addi $sp, $sp, -16  # IS_OPERATOR: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = character
+        sw $t1, 12($sp)     # t1 = operator
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        li $v0, 0           # Assume that character is not an operator
+    
+    ##### Main function  #####
+        beq $t0, '+', __IS_OPERATOR_RETURN_TRUE # If character is '+', return true
+        beq $t0, '-', __IS_OPERATOR_RETURN_TRUE # If character is '-', return true
+        beq $t0, '*', __IS_OPERATOR_RETURN_TRUE # If character is '*', return true
+        beq $t0, '/', __IS_OPERATOR_RETURN_TRUE # If character is '/', return true
+        beq $t0, '^', __IS_OPERATOR_RETURN_TRUE # If character is '^', return true
+        beq $t0, '!', __IS_OPERATOR_RETURN_TRUE # If character is '!', return true
+        
+        j __IS_OPERATOR_RESET
+        
+        __IS_OPERATOR_RETURN_TRUE:
+            li $v0, 1   # Return true
+
+    ##### Reset function #####
+    __IS_OPERATOR_RESET:
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        addi $sp, $sp, 16
+    jr $ra  # Return IS_OPERATOR
+
+OPERATOR_PRECEDENCE: # nguyenpanda
+    # OPERATOR_PRECEDENCE(operator: char = $a0) => $v0: int
+    #   - Get the precedence of an operator
+    # Parameters:
+    #   a0: Operator
+    # Return:
+    #   v0: Precedence of the operator, [invalid] = -1, ['+', '-'] = 1, ['*', '/'] = 2, ['^'] = 3, ['!'] = 4
+    ##### Init function  #####
+        addi $sp, $sp, -12  # OPERATOR_PRECEDENCE: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)          # t0 = operator
+        move $t0, $a0           # SUPPORT PASS BY REFERENCE
+        li $v0, -1              # Assume that operator is not valid
+
+    ##### Main function  #####
+        beq $t0, '+', __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '+', return 1
+        beq $t0, '-', __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '-', return 1
+        
+        beq $t0, '*', __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '*', return 2
+        beq $t0, '/', __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '/', return 2
+
+        beq $t0, '^', __OPERATOR_PRECEDENCE_RETURN_3 # If operator is '^', return 3
+        beq $t0, '!', __OPERATOR_PRECEDENCE_RETURN_4 # If operator is '!', return 4
+
+        j __OPERATOR_PRECEDENCE_RESET
+    ##### Return functions #####
+        __OPERATOR_PRECEDENCE_RETURN_1:
+            li $v0, 1   # Return 1
+            j __OPERATOR_PRECEDENCE_RESET
+        
+        __OPERATOR_PRECEDENCE_RETURN_2:
+            li $v0, 2   # Return 2
+            j __OPERATOR_PRECEDENCE_RESET
+
+        __OPERATOR_PRECEDENCE_RETURN_3:
+            li $v0, 3   # Return 3
+            j __OPERATOR_PRECEDENCE_RESET
+
+        __OPERATOR_PRECEDENCE_RETURN_4:
+            li $v0, 4   # Return 4
+            j __OPERATOR_PRECEDENCE_RESET
+
+    ##### Reset function #####
+        __OPERATOR_PRECEDENCE_RESET:
+            lw $ra, 0($sp)
+            lw $a0, 4($sp)
+            lw $t0, 8($sp)
+            addi $sp, $sp, 12
+    jr $ra  # Return OPERATOR_PRECEDENCE
+
+OPERATE: # 
+    # OPERATE(operator: char = $a0, operand_0: int = $a1, operand_1: int = $a2) => $v0: int
+    #   - Perform an operation
+    # Parameters:
+    #   a0: Operator
+    #   a1: Operand 0
+    #   a2: Operand 1
+    # Return:
+    #   v0: Result of the operation
+    ##### Init function  #####
+        # addi $sp, $sp, -20  # OPERATE: use 5 registers $ra, $a0, $a1, $a2, $t0
+        # sw $ra, 0($sp)
+        # sw $a0, 4($sp)
+        # sw $a1, 8($sp)
+        # sw $a2, 12($sp)
+        # sw $t0, 16($sp)     # result
+        # move $t0, $a0       # SUPPORT PASS BY REFERENCE
+
+    ##### Main function  #####
+        # beq $t0, 43, __OPERATE_ADDITION # If operator is '+', return 1
+        # beq $t0, 45, __OPERATE_SUBSTRACTION # If operator is '-', return 1
+        
+        # beq $t0, 42, __OPERATE_MULTIPLICATION # If operator is '*', return 2
+        # beq $t0, 47, __OPERATE_DIVISION # If operator is '/', return 2
+
+        # beq $t0, 94, __OPERATE_EXPONENTIATION # If operator is '^', return 3
+        # beq $t0, 33, __OPERATE_FACTORIAL # If operator is '!', return 4
+
+        # j __OPERATE_RESET
+    ##### Return functions #####
+        # __OPERATE_ADDITION:
+        #     add $v0, $a1, $a2
+        #     j __OPERATE_RESET
+        
+        # __OPERATE_SUBSTRACTION:
+        #     sub $v0, $a1, $a2
+        #     j __OPERATE_RESET
+
+        # __OPERATE_MULTIPLICATION:
+        #     mul $v0, $a1, $a2
+        #     j __OPERATE_RESET
+
+        # __OPERATE_DIVISION:
+        #     div $v0, $a1, $a2
+
+INFIX_TO_POSTFIX: # nguyenpanda
+    # INFIX_TO_POSTFIX($a0 = string) -> $v0 = string
+    #   - Convert an infix expression to a postfix expression
+    # Parameters:
+    #   a0: Infix expression
+    # Return:
+    #   v0: Postfix expression
+    ##### Init function  #####
+        addi $sp, $sp, -32  # INFIX_TO_POSTFIX: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = input string
+        sw $t1, 12($sp)     # t1 = string length
+        sw $t2, 16($sp)     # t2 = stack
+        sw $t3, 20($sp)     # t3 = result string
+        sw $t4, 24($sp)     # t4 = char
+        sw $t5, 28($sp)     # t5 = temp
+
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+
+        jal STRING_LENGHT
+        move $t1, $v0
+        blt $t1, 001, __invalid_len_INFIX_TO_POSTFIX    # If length < 001, jump to exception
+        bgt $t1, 100, __invalid_len_INFIX_TO_POSTFIX    # If length > 100, jump to exception
+
+        la $t2, stack
+
+        la $t3, postfix_string
+
+        j __INIT_LOOP
+
+    ##### Main function  #####
+        __loop_INFIX_TO_POSTFIX: 
+            # print end of loop
+            la $a0, ascii_ddd  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            la $a0, ascii_num_buffer  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            la $a0, postfix_string  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            jal new_line  # TODO DELETE
+
+            li $a0, '\t'
+            jal PRINT_CHAR
+            la $a0, stack
+            la $a1, PRINT_CHAR  # Reset postfix string
+            jal PRINT_STACK
+
+        __INIT_LOOP:
+            la $a0, ascii_new_char  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            # for char in infix:
+            lb $t4, 0($t0)
+            beq $t4, 0, __while_INFIX_TO_POSTFIX
+            beq $t4, '\n', __while_INFIX_TO_POSTFIX
+            addiu $t0, $t0, 1
+            
+            ### PRINT INFO
+                la $a0, ascii_for_char  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal YELLOW  # TODO DELETE
+                move $a0, $t4   # TODO DELETE
+                jal PRINT_CHAR  # TODO DELETE
+                jal RESET   # TODO DELETE
+                jal new_line    # TODO DELETE
+
+                la $a0, ascii_num_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                la $a0, postfix_string  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal new_line  # TODO DELETE
+
+                li $a0, '\t' # TODO DELETE
+                jal PRINT_CHAR # TODO DELETE
+                la $a0, stack # TODO DELETE
+                la $a1, PRINT_CHAR  # Reset postfix string
+                jal PRINT_STACK # TODO DELETE
+
+            # if (isOperand(char)): include '0' to '9', 'M', and '.'
+            move $a0, $t4
+            jal IS_OPERAND
+            beq $v0 1, __operand_INFIX_TO_POSTFIX
+            
+            # elif char == ' '
+            beq $t4, ' ', __loop_INFIX_TO_POSTFIX
+            
+            # elif char == '('
+            beq $t4, '(', __left_parenthesis_INFIX_TO_POSTFIX
+            
+            # elif char == ')'
+            beq $t4, ')', __right_parenthesis_INFIX_TO_POSTFIX
+            
+            # elif (isOperator(char)):
+            move $a0, $t4
+            jal IS_OPERATOR
+            beq $v0, 1, __operator_INFIX_TO_POSTFIX
+            
+            # else:
+                jal RED
+                la $a0, exc_invalid_character
+                jal PRINT_STRING
+                move $a0, $t0
+                jal PRINT_INT
+                li $a0, '-'
+                jal PRINT_CHAR
+                lb $a0, 0($t0)
+                jal PRINT_CHAR
+                jal RESET
+                jal new_line
+                j END_PROGRAM
+        
+        j __loop_INFIX_TO_POSTFIX
+
+        __while_INFIX_TO_POSTFIX:
+            # while stack:
+            move $a0, $t2
+            jal STACK_LENGTH
+            beq $v0, 0, __RESET_INFIX_TO_POSTFIX
+
+            li $a0, ' '
+            sb $a0, 0($t3)
+            addiu $t3, $t3, 1
+
+            # result += stack.pop()
+            move $a0, $t2
+            jal STACK_POP
+            sb $v0, 0($t3)
+            addiu $t3, $t3, 1
+            j __while_INFIX_TO_POSTFIX
+
+    ##### If/else if/else #####
+        __operand_INFIX_TO_POSTFIX:
+            sb $t4, 0($t3)
+            addiu $t3, $t3, 1
+            j __loop_INFIX_TO_POSTFIX
+
+        __left_parenthesis_INFIX_TO_POSTFIX:
+            move $a0, $t2
+            move $a1, $t4
+            jal STACK_PUSH
+            j __loop_INFIX_TO_POSTFIX
+
+        __right_parenthesis_INFIX_TO_POSTFIX:
+            __while_right_parenthesis_INFIX_TO_POSTFIX:
+                # while stack and stack[-1] != '(':
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __if_right_parenthesis_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                beq $v0, '(', __if_right_parenthesis_INFIX_TO_POSTFIX
+
+                li $t4, ' '
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                
+                jal STACK_POP
+                sb $v0, 0($t3)
+                addiu $t3, $t3, 1
+
+                j __while_right_parenthesis_INFIX_TO_POSTFIX    
+            __if_right_parenthesis_INFIX_TO_POSTFIX:
+                # if stack and stack[-1] == '(':
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __loop_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                bne $v0, '(', __loop_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_POP
+            j __loop_INFIX_TO_POSTFIX
+
+        __operator_INFIX_TO_POSTFIX:
+            __check_exclamation__operator_INFIX_TO_POSTFIX:
+                bne $t4, '!', __check_minus__operator_INFIX_TO_POSTFIX
+                li $t4, ' '
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                li $t4, '!'
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                j __loop_INFIX_TO_POSTFIX
+
+            __check_minus__operator_INFIX_TO_POSTFIX:
+                # if (char == '-' 
+                # and (result.isNotEmpty or result[-1] in ('(', ' ', '*', '/', '^'))
+                # and (stack.isNotEmpty or stack[-1] in ('(', ' ', '*', '/', '^'))):
+                bne $t4, '-', __while_operator_INFIX_TO_POSTFIX
+
+                la $a0, postfix_string
+                jal STRING_LENGHT
+                beq $v0, 0, __next_and__operator_INFIX_TO_POSTFIX
+                
+                addi $v0, $v0, -1
+                lb $t5, postfix_string($v0)
+                beq $t5, '(', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, ' ', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '*', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '/', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '^', __next_and__operator_INFIX_TO_POSTFIX
+
+                j __while_operator_INFIX_TO_POSTFIX
+
+                __do_minus__operator_INFIX_TO_POSTFIX:
+                    sb $t4, 0($t3)  # result += '-'
+                    addiu $t3, $t3, 1
+                    j __loop_INFIX_TO_POSTFIX
+
+                __next_and__operator_INFIX_TO_POSTFIX:
+                    move $a0, $t2
+                    jal STACK_LENGTH
+                    beq $v0, 0, __do_minus__operator_INFIX_TO_POSTFIX
+
+                    move $a0, $t2
+                    jal STACK_TOP
+                    beq $v0, '(', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, ' ', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '*', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '/', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '^', __do_minus__operator_INFIX_TO_POSTFIX
+            
+            __while_operator_INFIX_TO_POSTFIX:
+                # while stack and isOperator(stacxk[-1]) != '(' and operator_precedence(char) <= operator_precedence(stack[-1]):
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __end_while_operator_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                beq $v0, '(', __end_while_operator_INFIX_TO_POSTFIX
+
+                move $a0, $v0
+                jal OPERATOR_PRECEDENCE
+                move $t5, $v0
+
+                move $a0, $t4
+                jal OPERATOR_PRECEDENCE
+                blt $t5, $v0, __end_while_operator_INFIX_TO_POSTFIX
+
+                li $t5, ' '
+                sb $t5, 0($t3)
+                addiu $t3, $t3, 1
+
+                move $a0, $t2
+                jal STACK_POP
+                sb $v0, 0($t3)
+                addiu $t3, $t3, 1
+
+                j __while_operator_INFIX_TO_POSTFIX
+            __end_while_operator_INFIX_TO_POSTFIX:
+
+            move $a0, $t2
+            move $a1, $t4
+            jal STACK_PUSH
+            
+            li $t4, ' '
+            sb $t4, 0($t3)
+            addiu $t3, $t3, 1
+            j __loop_INFIX_TO_POSTFIX
+
+    ##### Exception function #####
+        __invalid_len_INFIX_TO_POSTFIX:
+            jal RED
+            la $a0, exc_inval_length_expression
+            jal PRINT_STRING
+            move $a0, $t1
+            jal PRINT_INT
+            jal RESET
+            jal new_line
+            j END_PROGRAM
+
+    ##### Reset function #####
+    __RESET_INFIX_TO_POSTFIX:
+        sb $zero, 0($t3)    # Add null terminator
+        la $a0, stack       # Reset stack
+        jal STACK_RESET
+        move $v0, $t3
+
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        lw $t2, 16($sp)
+        lw $t3, 20($sp)
+        lw $t4, 24($sp)
+        lw $t5, 28($sp)
+        addi $sp, $sp, 32
+    jr $ra  # Return INFIX_TO_POSTFIX
+
+
+EVALUATE_INFIX: # nguyenpanda
+    # EVALUATE_INFIX(infix: str = $a0) => $f30: float
+    #   - Convert an infix expression to a postfix expression
+    # Parameters:
+    #   a0: Infix expression
+    ##### Init function  #####
+        addi $sp, $sp, -44  # EVALUATE_INFIX: use 4 registers $ra, $a0, $t0, $t1
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = input string
+        sw $t1, 12($sp)     # t1 = string length
+        sw $t2, 16($sp)     # t2 = operator
+        sw $t3, 20($sp)     # t3 = operand  
+        sw $t4, 24($sp)     # t4 = index of the current character
+        sw $t5, 28($sp)     # t5 = index of the current operator
+        sw $t6, 32($sp)     # t6 = index of the current operand
+        sw $t7, 36($sp)     # t7 = index of the postfix expression
+        sw $t8, 40($sp)     # t8 = index of the current operator stack
+        sw $t9, 44($sp)     # t9 = index of the current operand stack
+        # sw $t10, 48($sp)    # t1 = index of the current postfix expression
+        
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+
+        jal STRING_LENGHT
+        move $t1, $v0
+        blt $t1, 1, __invalid_len__EVALUATE_INFIX   # If length < 1, jump to exception
+        bgt $t1, 100, __invalid_len__EVALUATE_INFIX # If length > 100, jump to exception
+
+        li $t2, 0           # Init operator stack
+        li $t3, 0           # Init operand stack
+        li $t4, 0           # Init index of the current character
+        li $t5, 0           # Init index of the current operator
+        li $t6, 0           # Init index of the current operand
+        li $t7, 0           # Init index of the postfix expression
+        li $t8, 0           # Init index of the current operator stack
+        li $t9, 0           # Init index of the current operand stack
+        # li $t10, 0          # Init index of the current postfix expression
+    
+    ##### Main function  #####
+
+
+    ##### Reset function #####
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        addi $sp, $sp, 16
+    ### Exception function ###
+        __invalid_len__EVALUATE_INFIX:
+            jal RED
+            la $a0, exc_inval_length_expression
+            jal PRINT_STRING
+            move $a0, $t0
+            jal PRINT_INT
+            jal RESET
+            j END_PROGRAM
+    jr $ra  # Return EVALUATE_INFIX
+
 ### MATH
+INT_TO_FLOAT: # nguyenpanda
+    # INT_TO_FLOAT(int = $a0) => $f30: float
+    #   - Convert an integer to a float
+    # Parameters:
+    #   a0: Integer
+    # Return:
+    #   f30: Float
+    # Example:
+    #   - INT_TO_FLOAT(10) => 10.0
+    #       li $a0, 10
+    #       jal INT_TO_FLOAT
+    #       -> mov.s $f0, $f30
+    #       -> mfc1 $t2, $f30
+    ##### Init function  #####
+        addi $sp, $sp, -8  # INT_TO_FLOAT: use 2 registers $a0, $ra
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+
+    ##### Main function  #####
+        mtc1 $a0, $f30
+        cvt.s.w $f30, $f30
+        mfc1 $a0, $f30
+
+    ##### Reset function #####
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        addi $sp, $sp, 8
+    jr $ra  # Return INT_TO_FLOAT
+
 FACTORIAL: # nguyenpanda
     # FACTORIAL(unsighted int = $a0) => $v0: unsighted int
     #   - Calculate the factorial of a number
@@ -662,14 +1055,13 @@ FACTORIAL: # nguyenpanda
                 jal __FACT
 
         ##### Reset function #####
-        __end__FACT:
-            lw $t0, 0($sp)
-            lw $ra, 4($sp)
-            addi $sp, $sp, 8
+            __end__FACT:
+                lw $t0, 0($sp)
+                lw $ra, 4($sp)
+                addi $sp, $sp, 8
 
-            mul $v0, $t0, $v0
-
-            jr $ra      # Return __FACT
+                mul $v0, $t0, $v0
+        jr $ra      # Return __FACT
 
     ##### Reset function #####
     __END_FACTORIAL:
@@ -687,6 +1079,71 @@ FACTORIAL: # nguyenpanda
         jal RESET
         jal new_line
         j END_PROGRAM   # Return __exception_FACTORIAL
+
+ADDITION: # nguyenpanda
+    # ADDITION(int_0 = $a0, int_1 = $a1) => $v0: float
+    #   - Add 2 numbers
+    # Parameters:
+    #   $a0: First number
+    #   $a1: Second number
+    # Return:
+    #   $v0: (First number + Second number)
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+    jr $ra  # Return ADDITION
+
+SUBSTRACTION: # nguyenpanda
+    # SUBSTRACTION(int_0 = $a0, int_1 = $a1) => $v0: int
+    #   - Substract 2 numbers
+    # Parameters:
+    #   $a0: First number
+    #   $a1: Second number
+    # Return:
+    #   $v0: (First number - Second number)
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+    jr $ra  # Return SUBSTRACTION
+
+MULTIPLICATION: # nguyenpanda
+    # MULTIPLICATION(int_0 = $a0, int_1 = $a1) => $v0: int
+    #   - Multilication 2 numbers
+    # Parameters:
+    #   $a0: First number
+    #   $a1: Second number
+    # Return:
+    #   $v0: (First number * Second number)
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+    jr $ra  # Return MULTIPLICATION
+
+DIVISION: # nguyenpanda
+    # DIVISION(int_0 = $a0, int_1 = $a1) => $v0: int
+    #   - Division 2 numbers
+    # Parameters:
+    #   $a0: First number
+    #   $a1: Second number
+    # Return:
+    #   $v0: (First number / Second number)
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+    jr $ra  # Return DIVISION
+
+EXPONENTIATION: # nguyenpanda
+    # EXPONENTIATION(int_0 = $a0, int_1 = $a1) => $v0: int
+    #   - Substract 2 numbers
+    # Parameters:
+    #   $a0: First number
+    #   $a1: Second number
+    # Return:
+    #   $v0: (First number ^ Second number)
+    ##### Init function  #####
+    ##### Main function  #####
+    ##### Reset function #####
+    jr $ra  # Return EXPONENTIATION
 
 ### STRING MANIPULATOR
 STRING_LENGHT: # nguyenpanda
@@ -780,6 +1237,38 @@ COMPARE_STRING: # nguyenpanda
             addi $sp, $sp, 20
     jr $ra  # Return COMPARE_STRING
 
+RESET_STRING: # nguyenpanda
+    # RESET_STRING(string = $a0) => void
+    #   - Reset a string to null character
+    # Parameters:
+    #   $a0: Address of the string, argument PASS BY REFERENCE
+    ##### Init function  #####
+        addi $sp, $sp, -4       # RESET_STRING: use 1 register $ra
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)          # t0 = string
+        sw $t1, 12($sp)         # t1 = null character
+
+    ##### Main function  #####
+        move $t0, $a0           # SUPPORT PASS BY REFERENCE
+        li $t1, 0               # t1 = null character
+
+        __loop_RESET_STRING:
+            sb $t1, 0($t0)      # str[t0] = null character
+            addiu $t0, $t0, 1   # str[t0++] Move to next character
+            lb $t2, 0($t0)      # t2 = str[t0] Load character from memory
+            beq $t2, $zero, __end_loop_RESET_STRING    # If character is null, end loop
+        j __loop_RESET_STRING
+
+    ##### Reset function #####
+    __end_loop_RESET_STRING:
+        lw $t1, 12($sp)
+        lw $t0, 8($sp)
+        lw $a0, 4($sp)
+        lw $ra, 0($sp)
+        addi $sp, $sp, 4
+    jr $ra  # Return RESET_STRING
+
 ### UTILS
 END_PROGRAM: # nguyenpanda
     jal YELLOW                  # END_PROGRAM
@@ -817,7 +1306,11 @@ WRITE_TO_FILE_: # nguyenpanda
         move $t2, $a2   # filename
         move $t3, $a3   # mode
 
+        beq $a2, 1, __MAIN_WRITE_TO_FILE_
+        beq $a2, 9, __MAIN_WRITE_TO_FILE_
+        j __INVALID_MODE_WRITE_TO_FILE_
     ##### Main function  #####
+        __MAIN_WRITE_TO_FILE_:
         # Open the file
         li $v0, 13      # syscall 13: open
         move $a0, $a2   # filename
@@ -838,7 +1331,17 @@ WRITE_TO_FILE_: # nguyenpanda
         move $a0, $s0   # File descriptor
         syscall
 
+        j __RESET_WRITE_TO_FILE_
+    ##### Exception #####
+        __INVALID_MODE_WRITE_TO_FILE_:
+            jal RED
+            la $a0, exc_write_to_file_invalid_mode
+            jal PRINT_STRING
+            jal RESET
+            j END_PROGRAM
+
     ##### Reset function #####
+        __RESET_WRITE_TO_FILE_:
         lw $t3, 12($sp)
         lw $t2, 8($sp)
         lw $t1, 4($sp)
@@ -865,8 +1368,12 @@ WRITE_TO_FILE: # nguyenpanda
         addi $t1, $v0, 1    # length of the message (including null character)
         move $t2, $a1       # filename
         move $t3, $a2       # mode
-        
+
+        beq $a2, 1, __MAIN_WRITE_TO_FILE
+        beq $a2, 9, __MAIN_WRITE_TO_FILE
+        j __INVALID_MODE_WRITE_TO_FILE
     ##### Main function  #####
+        __MAIN_WRITE_TO_FILE:
         # Open the file
         li $v0, 13      # syscall 13: open
         move $a0, $a1   # filename
@@ -887,14 +1394,25 @@ WRITE_TO_FILE: # nguyenpanda
         move $a0, $s0   # File descriptor
         syscall
 
+        j __RESET_WRITE_TO_FILE
+    ##### Exception #####
+        __INVALID_MODE_WRITE_TO_FILE:
+            jal RED
+            la $a0, exc_write_to_file_invalid_mode
+            jal PRINT_STRING
+            jal RESET
+            j END_PROGRAM
+
     ##### Reset function #####
-        lw $ra, 16($sp)
-        lw $t3, 12($sp)
-        lw $t2, 8($sp)
-        lw $t1, 4($sp)
-        lw $t0, 0($sp)
-        addi $sp, $sp, 20
+        __RESET_WRITE_TO_FILE:
+            lw $ra, 16($sp)
+            lw $t3, 12($sp)
+            lw $t2, 8($sp)
+            lw $t1, 4($sp)
+            lw $t0, 0($sp)
+            addi $sp, $sp, 20
     jr $ra  # Return WRITE_TO_FILE
+
 
 new_line: # RestingKiwi
     li $v0, 11    # new_line
@@ -903,6 +1421,7 @@ new_line: # RestingKiwi
     jr $ra  # Return new_line
 
 ### COLOR
+COLOR: # nguyenpanda
     RED: # nguyenpanda
         la $a0, color_r # RED
         li $v0, 4
@@ -952,8 +1471,8 @@ new_line: # RestingKiwi
         jr $ra  # Return RESET
 
 ### TEST
-TEST_STACK:
-    la $a0, stack_test
+TEST_STACK: # nguyenpanda
+    la $a0, stack
     jal STACK_INIT
 
     li $a1, 'H'
@@ -983,30 +1502,111 @@ TEST_STACK:
     li $a1, 'N'
     jal STACK_PUSH
 
-    jal PRINT_STACK_CHAR
+    la $a1, PRINT_CHAR
+    jal PRINT_STACK
 
-    la $a0, stack_test
+    la $a0, stack
+    jal STACK_POP
+    move $a0, $v0
+    la $a1, PRINT_CHAR
+    jal PRINT_CHAR
+
+    jal new_line
+
+    la $a0, stack
     jal STACK_POP
     move $a0, $v0
     jal PRINT_CHAR
 
     jal new_line
 
-    la $a0, stack_test
-    jal STACK_POP
-    move $a0, $v0
-    jal PRINT_CHAR
+    la $a0, stack
+    la $a1, PRINT_CHAR
+    jal PRINT_STACK
 
-    jal new_line
-
-    la $a0, stack_test
-    jal PRINT_STACK_CHAR
-
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_TOP
     move $a0, $v0
     jal PRINT_CHAR
-
     jal new_line
 
+    la $a0, stack
+    jal STACK_RESET
+
+    la $a1, PRINT_CHAR
+    jal PRINT_STACK
+
+    jal new_line
     j END_PROGRAM
+
+TEST_STACK_PUSH: # nguyenpanda
+    la $a0, stack
+    jal STACK
+
+    li $a1, 1
+
+    __loop_TEST_PUSH_STACK:
+        jal STACK_PUSH
+        sll $a1, $a1, 1
+        blt $a1, 10000, __loop_TEST_PUSH_STACK
+
+    la $a1, PRINT_INT
+    jal PRINT_STACK
+    j END_PROGRAM
+
+TEST_MAIN:
+    la $a0, stack
+    jal STACK_INIT
+
+    main_loop_TEST_MAIN: # Loop and ask user to input
+        ##### Init main  #####
+            # Print "Please insert your expression: "
+            jal CYAN
+            la $a0, ascii_in_prompt     # Load address of input prompt
+            jal PRINT_STRING            # Print input prompt
+            jal RESET
+
+            # Read input from user
+            la $a0, input_string        # Load address of input buffer
+            li $a1, 102                 # Set max length of input buffer (1 space for null character)
+            jal READ_STRING_FROM_USER   # Read input from user
+
+            # 'quit' check
+            la $a0, quit_string         # Load address of quit string
+            la $a1, input_string        # Load address of user input
+            jal COMPARE_STRING          # Compare 2 strings
+            beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
+
+            # Print "Result: "
+            jal CYAN
+            la $a0, ascii_out_prompt    # Load address of output prompt
+            jal PRINT_STRING            # Print output prompt
+            jal RESET
+            jal new_line
+
+        #####    MAIN    #####
+            la $a0, input_string        # Load address of input buffer
+            jal INFIX_TO_POSTFIX        # Evaluate the infix expression
+
+            jal CYAN
+            la $a0, ascii_postfix
+            jal PRINT_STRING
+            jal RESET
+
+            la $a0, postfix_string      # Load address of the postfix expression
+            jal PRINT_STRING            # Print the postfix expression
+            jal new_line
+
+        ##### Write file #####
+            # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
+            la $a0, input_string        # Load address of input buffer
+            la $a1, filename            # Load address of the filename
+            li $a2, 9                   # Mode 9: write only with create and append
+            jal WRITE_TO_FILE           # Write the input string to the file
+
+        ##### Reset main  #####
+            la $a0, postfix_string
+            jal RESET_STRING
+    j main_loop_TEST_MAIN
+
+TEST_MAIN_2:

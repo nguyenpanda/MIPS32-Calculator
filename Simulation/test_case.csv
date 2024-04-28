@@ -1,0 +1,2 @@
+id,bool_value,bool_postfix,got_value,except_value,got_postfix,expected_postfix
+0,True,True,98.0,98,-1 -4 3 + * 3 - 10 10 * +,-1 -4 3 + * 3 - 10 10 * +

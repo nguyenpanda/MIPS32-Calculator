@@ -1,3 +1,23 @@
+import csv
+
+def compare_float(x, y):
+    return abs(x - y) < 1e-6
+
+def print_info(char, num_buffer, stack, optional=None):
+    if optional:
+        print(optional)
+    print('\033[1;92m----------------------------\033[0m')
+    print(f'Getting info for: \033[1;93m{char}\033[0m')
+    print('\t->Num buffer:', num_buffer)
+    print('\t->Stack:', stack)
+    
+def print_info_(char, num_buffer, stack, optional=None):
+    if optional:
+        print(optional)
+    print('\t---')
+    print('\t->Num buffer:', num_buffer)
+    print('\t->Stack:', stack)
+
 def add(x, y):
     return x + y
 
@@ -19,7 +39,7 @@ def exp(x, y):
     return x ** y
 
 def isOperand(char: str) -> bool:
-    return char.isdigit() or char == '.'
+    return char.isdigit() or char == '.' or char == 'M'
 
 def isOperator(char: str) -> bool:
     return char in ('+', '-', '*', '/', '^', '!')
@@ -39,10 +59,9 @@ def infixToPostfix(string: str, M: int):
     result: str = ''
     
     for char in string:
+        print_info(char, result, stack)
         if (isOperand(char)):
             result += char
-        elif char == 'M':
-            result += 'M'
         elif char == ' ':
             continue
         elif char == '(':
@@ -54,15 +73,17 @@ def infixToPostfix(string: str, M: int):
             if stack and stack[-1] == '(':
                 stack.pop()
         elif isOperator(char):
-            if (char == '-' 
-                and (not result or result[-1] in ('(', ' ', '*', '/', '^'))
-                and (not stack or stack[-1] in ('(', ' ', '*', '/', '^'))):
-                result += '-'
+            if char == '!':
+                result += ' !'
                 print(f'{char}| ', stack, '', f'|{result}|')
                 continue
             
-            if char == '!':
-                result += ' !'
+            if (char == '-' 
+                and (not result or result[-1] in ('(', ' ', '*', '/', '^'))
+                and (not stack or stack[-1] in ('(', ' ', '*', '/', '^'))
+                ):
+                print(f'bool: {char == '-'} - {not stack or stack[-1] in ('(', ' ', '*', '/', '^')} - {not result or result[-1] in ("(", " ", "*", "/", "^")}')
+                result += char
                 print(f'{char}| ', stack, '', f'|{result}|')
                 continue
             
@@ -71,13 +92,12 @@ def infixToPostfix(string: str, M: int):
                    and precedence(stack[-1]) >= precedence(char)):
                 result += ' '
                 result += stack.pop()
+                
             stack.append(char)
             result += ' '
         else:
             raise Exception('Invalid character')
-        
-        print(f'{char}| ', stack, '', f'|{result}|')
-                
+        print_info_(char, result, stack)
     while stack:
         result += ' '
         result += stack.pop()
@@ -89,7 +109,7 @@ def evaluate_postfix(expression: str, M: int):
     number = ''
 
     for char in expression:
-        print(f'|{char}| ', stack, '', f'|{number}|')
+        # print_info(char, number, stack)
         if char.isdigit() or char == '.' or (char == '-' and len(stack) != 2):
             number += char
         elif char == 'M':
@@ -138,29 +158,80 @@ def evaluate_postfix(expression: str, M: int):
                 stack.append(operand1 ** operand2)
             else:
                 raise ValueError("Invalid token in expression")
-
+    # print_info_(char, number, stack)
+    
     if number:
         print(f'\t->|{char}| ', stack, '', f'|{number}|')
         # if number != '-':
         stack.append(float(number))
 
     if len(stack) != 1:
-        raise ValueError("Invalid postfix expression")
+        raise ValueError('Invalid postfix expression')
     
     return stack[0]
 
+def test_csv(filename, output):
+    fields = []
+    rows = []
+    case: int = 0
+    true_case: int = 0
+    fasle_case: int = 0
+
+    with open(filename, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        fields = next(csvreader)
+        for row in csvreader:
+            rows.append(row)
+            case += 1
+    
+    with open(output, 'w') as test_csv:
+        test_csv.write(f'id,bool_value,bool_postfix,got_value,except_value,got_postfix,expected_postfix\n')
+        for i, row in enumerate(rows):
+            try:
+                __postfix: str = infixToPostfix(row[2], row[0])
+                print('\n\n\033[1;93mPostfix:\033[0m', __postfix)
+
+                __result = evaluate_postfix(__postfix, row[0])
+                print('\n\033[1;94mEvaluating the postfix expression...\n\033[0m')
+
+                __result_bool = compare_float(__result, float(row[1]))
+                test_csv.write(f'{i},{__result_bool},{str(__postfix) == str(row[3])},{__result},{row[1]},{__postfix},{row[3]}\n')
+
+                if __result_bool:
+                    true_case += 1
+                else:
+                    fasle_case += 1
+            except Exception as e:
+                fasle_case += 1
+                print(f'\033[1;91m{e}\033[0m')
+                test_csv.write(f'{i},{False},{str(__postfix) == str(row[3])},{e},{row[1]},{__postfix},{row[3]}\n')
+
+    print(f'\033[1;91m{fasle_case} case are wrong in {case} test cases\033[0m')
+
 if __name__ == '__main__':
-    M = 10
-    while True:
-        try:
-            __input: str = input('\033[1;93mEnter the expression: \033[0m')
+    # test_csv('data.csv', 'test_case.csv')
+    test_csv('temp.csv', 'test_case.csv')
+
+    # M = 10
+    # while True:
+    #     try:
+    #         __input: str = input('\033[1;93mEnter the expression: \033[0m')
             
-            __input: str = infixToPostfix(__input, M)
-            print('\033[1;93mPostfix:\033[0m', __input)
+    #         __input: str = infixToPostfix(__input, M)
+    #         print('\n\n\033[1;93mPostfix:\033[0m', __input)
             
-            __input: str = evaluate_postfix(__input, M)
-            print('\033[1;93mResult:\033[0m', __input)
-        except Exception as e:
-            print(f'\033[1;91m{e}\033[0m')
-            
-    print('\n\033[1;94mEvaluating the postfix expression...\n\033[0m')
+    #         __input: str = evaluate_postfix(__input, M)
+    #         print('\033[1;93mResult:\033[0m', __input)
+    #     except Exception as e:
+    #         print(f'\033[1;91m{e}\033[0m')
+
+# t0 = input string
+# t1 = string length
+# t2 = stack
+# t3 = result string
+# t4 = char
+# t5 = temp
+
+
+
+
