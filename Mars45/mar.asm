@@ -1,11 +1,21 @@
 # spim .asm
 .data
     ## Variables
+        test_num:   .word 100 # 1.0
         # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
         stack:              .space 208 # Stack
         
         input_string:       .space 104 # MAX LENGTH OF INPUT STRING IS 100
         postfix_string:     .space 304 # MAX LENGTH OF POSTFIX STRING IS 300
+        number_buffer:      .space 204 # Buffer for number
+        temp_space:         .space 204 # Temporary space for stack
+
+    ### Constant
+        double_0:       .double 0.0
+        double_1:       .double 1.0
+        double_10:      .double 10.0
+        double_10p6:    .double 100000000.0
+        double_test:    .double -123450.10001
 
     ### file    
         filename:   .asciiz "calc_log.txt"
@@ -24,15 +34,18 @@
         ascii_exit_prompt:  .asciiz "Exiting program...!\n"
         ascii_stack_top:	.asciiz "<-TOP (Length="
         ascii_write_result: .asciiz ","
+        ascii_section:      .asciiz "\033[1;91m####################################################\033[0m\n"
 
     ## Exception
         # exc_divide_by_zero:         .asciiz "Error: Divide by zero\n"
         exc_invalid_character:          .asciiz "Error: Invalid character at position="
+        exc_invalid_postfix_expression: .asciiz "\033[1;91mError: Invalid postfix expression\n\033[0m"
         exc_inval_length_expression:    .asciiz "Error: Expression length must >= 1 or <= 100, got length="
         exc_factorial_out_of_bound:     .asciiz "Error: Factorial's argument must less than 16, got n="
         exc_write_to_file_invalid_mode: .asciiz "WRITE_TO_FILE only accept 'w' ($a2=1) or 'a' ($a2=9) mode, got="
         exc_stack_overflow:             .asciiz "Stack overflow!\n"
         exc_stack_underflow:            .asciiz "Stack underflow!\n"
+        exc_double_to_string:           .asciiz "\033[1;91mError: Double to string conversion failed\n\033[0m"
     
     ## Color
         color_r: .asciiz "\033[1;91m" 	# Red color escape sequence
@@ -46,10 +59,263 @@
         
 .text
     .globl  main
-    
+
 main:
-    jal TEST_MAIN
+    jal INIT_MAIN
+
+    j TEST_DOUBLE_TO_STRING
+    # j TEST_MAIN
 j END_PROGRAM
+
+INIT_MAIN:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    la $a0, stack
+    jal STACK_INIT
+
+    l.d $f24, double_test
+    #l.d $f26, double_0
+    #l.d $f28, double_1
+    #l.d $f30, double_10
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+#### DOUBLE
+DOUBLE_TO_STRING: # nguyenpanda
+    # DOUBLE_TO_STRING(double = $f12) => $v0, $v1
+    #   - Convert a double to a string
+    # Parameters:
+    #   f12: Double
+    # Return:
+    #   v0: Integer string
+    #   v1: Decimal string
+    #   number_buffer: String
+    ##### Init function #####
+        addi $sp, $sp, -36  # DOUBLE_TO_STRING: use 7 registers $ra, $t0, $t1, $t2, $t3, $t4, $t5
+        sw $ra, 0($sp)
+        sw $t0, 4($sp)  # number_buffer
+        sw $t1, 8($sp)  # temp_space
+        sw $t2, 12($sp) # is_negative
+        sw $t3, 16($sp) # temp
+        sw $t4, 20($sp) # temp count
+        sw $t5, 24($sp) # temp count
+        sw $t6, 28($sp) # temp count
+        sw $a0, 32($sp)
+
+        la $t0, number_buffer
+        la $t1, temp_space
+        li $t2, 0       # is_negative = False
+        l.d $f22, double_10p6
+
+        cvt.w.d $f18, $f12
+	    mfc1.d $v0, $f18
+
+        mtc1.d $v0, $f16
+        cvt.d.w $f16, $f16
+
+        sub.d $f16, $f12, $f16
+        
+        mul.d $f16, $f16, $f22
+        cvt.w.d $f16, $f16
+        mfc1 $v1, $f16
+
+        bge $v0, $zero, __MAIN_DOUBLE_TO_STRING
+        bgt $v1, $zero, __exception_DOUBLE_TO_STRING
+        li $t2, 1
+        sub $v0, $zero, $v0
+        sub $v1, $zero, $v1
+        li $t3, '-'
+        sb $t3, 0($t0)
+        addi $t0, $t0, 1
+        
+    ##### Main function #####
+        __MAIN_DOUBLE_TO_STRING:
+        bne $v0, $zero, __NEXT_DOUBLE_TO_STRING
+        li $t3, '0'
+        sb $t3, 0($t0)
+        addi $t0, $t0, 1
+
+        __NEXT_DOUBLE_TO_STRING:
+        move $a0, $v0
+        jal __PRIVATE_LOOP_DOUBLE_TO_STRING
+
+        beq $v1, $zero, __end_DOUBLE_TO_STRING
+        
+        li $t3, '.'
+        sb $t3, 0($t0)
+        addi $t0, $t0, 1
+
+        la $t1, temp_space # Reset $t1
+
+        # Convert double_10p6 to integer at $t4
+        cvt.w.d $f18, $f22
+	    mfc1.d $t4, $f18 # $t4 = 1000000
+
+        div $v1, $t4 # $t5 = quotient
+        mfhi $t5
+        blt $t5, 9, __NEXT_DOUBLE_TO_STRING_2
+        li $t6, -1
+
+        __loop_count_0_DOUBLE_TO_STRING:
+
+            mul $t5, $t5, 10
+            addi $t6, $t6, 1
+            blt $t5, $t4, __loop_count_0_DOUBLE_TO_STRING
+
+        __loop_add_0_DOUBLE_TO_STRING:
+            beq $t6, 0, __NEXT_DOUBLE_TO_STRING_2
+            li $t3, '0'
+            sb $t3, 0($t0)
+            addi $t0, $t0, 1
+            addi $t6, $t6, -1
+            bne $t6, $zero, __loop_add_0_DOUBLE_TO_STRING
+
+        __NEXT_DOUBLE_TO_STRING_2:
+        move $a0, $v1
+        jal __PRIVATE_LOOP_DOUBLE_TO_STRING
+
+        j __end_DOUBLE_TO_STRING
+
+    ##### SUB FUNCTION #####
+        __PRIVATE_LOOP_DOUBLE_TO_STRING:
+            __LOOP_PRIVATE_LOOP_DOUBLE_TO_STRING:
+                beq $a0, $zero, __END_LOOP_DOUBLE_TO_STRING
+                div $a0, $a0, 10
+                mflo $a0
+                mfhi $t3
+                addi $t3, $t3, 48
+                sb $t3, 0($t1)
+                addi $t1, $t1, 1
+                j __LOOP_PRIVATE_LOOP_DOUBLE_TO_STRING
+
+            __END_LOOP_DOUBLE_TO_STRING:
+                addi $t1, $t1, -1
+                lb $t3, 0($t1)
+                beq $t3, 0, __RETURN_DOUBLE_TO_STRING
+                sb $t3, 0($t0)
+                addi $t0, $t0, 1
+                j __END_LOOP_DOUBLE_TO_STRING
+
+            __RETURN_DOUBLE_TO_STRING:
+                jr $ra
+
+    ##### Exception function #####
+		__exception_DOUBLE_TO_STRING:
+            la $a0, exc_double_to_string
+            jal PRINT_STRING
+            eret
+		
+    ##### Reset function #####
+    __end_DOUBLE_TO_STRING:
+        la $a0, temp_space
+        jal RESET_STRING
+
+        cvt.w.d $f12, $f12
+	    mfc1.d $v0, $f12
+
+        lw $ra, 0($sp)
+        lw $t0, 4($sp)
+        lw $t1, 8($sp)
+        lw $t2, 12($sp)
+        lw $t3, 16($sp)
+        lw $t4, 20($sp)
+        lw $t5, 24($sp)
+        lw $t6, 28($sp)
+        lw $a0, 28($sp)
+        addi $sp, $sp, 36
+    jr $ra  # Return DOUBLE_TO_STRING
+
+STRING_TO_DOUBLE: # nguyenpanda
+    # STRING_TO_DOUBLE(string = $a0) => $f0: double
+    # - Convert a string to a double
+    # Parameters:
+    #   a0: String
+    # Return:
+    #   f0: Double
+    ##### Init function  #####
+        addi $sp, $sp, -24  # STRING_TO_DOUBLE: use 2 registers $ra, $a0
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)  # input string
+        sw $t1, 12($sp) # temp char in for loop
+        sw $t2, 16($sp) # is_negative
+        sw $t3, 20($sp) # is_unit_10
+        # sw $t4, 24($sp) # decimal
+
+        move $t0, $a0   # SUPPORT PASS BY REFERENCE
+        lb $t1, 0($a0)  # Load first character
+        li $t2, 0       # is_negative = False
+        li $t3, 1       # is_unit_10 = True
+        mov.d $f0, $f26 # f0 = 0.0
+
+        beq $t1, '-', __negative_STRING_TO_DOUBLE  # If character is '-', jump to negative
+    ##### Main function  #####
+        __loop_STRING_TO_DOUBLE:
+            lb $t1, 0($t0)  # Load character
+            addi $t0, $t0, 1  # Move to the next character
+            beq $t1, 0, __end_STRING_TO_DOUBLE      # If character is null, end loop
+            beq $t1, '\n', __end_STRING_TO_DOUBLE   # If character is new line, end loop
+
+            bgt $t1, '9', __invalid_character_STRING_TO_DOUBLE  # If character > '9', jump to exception
+            blt $t1, '0', __check_dot_STRING_TO_DOUBLE
+            # If char == digit
+            sub $t1, $t1, '0'  # Convert char to int
+            mtc1 $t1, $f4      # Move value from register to float register
+            cvt.d.w $f4, $f4   # Convert int to double (IEEE 754 format)
+
+            # If is_unit_10
+            bne $t3, 1, __unit_is_not_10_STRING_TO_DOUBLE
+                mul.d $f0, $f0, $f30    # f0 *= 10
+                add.d $f0, $f0, $f4     # f0 += digit
+                j __loop_STRING_TO_DOUBLE  # Continue loop
+            # If is_unit_10 = False
+            __unit_is_not_10_STRING_TO_DOUBLE:
+                div.d $f4, $f4, $f30    # f4 /= 10
+                add.d $f0, $f0, $f4     # f0 += 0.1*digit
+                l.d $f4, double_10      # f4 = 0.0
+                mul.d $f30, $f30, $f4
+                j __loop_STRING_TO_DOUBLE  # Continue loop
+
+            j __invalid_character_STRING_TO_DOUBLE
+
+    ##### If/elif/else functions #####
+    __check_dot_STRING_TO_DOUBLE:
+        bne $t1, '.', __invalid_character_STRING_TO_DOUBLE
+        addi $t3, $zero, 0  # is_unit_10 = False
+        j __loop_STRING_TO_DOUBLE
+
+    __negative_STRING_TO_DOUBLE:
+        addi $t0, $t0, 1            # Move to the next character
+        li $t2, 1                   # is_negative = True
+        j __loop_STRING_TO_DOUBLE   # Continue loop
+
+    ##### Exception functions #####
+        __invalid_character_STRING_TO_DOUBLE:
+            la $a0, exc_invalid_character
+            jal PRINT_STRING
+            move $a0, $t0
+            jal PRINT_CHAR
+            jal new_line
+            eret
+         
+    ##### Reset function #####
+    __end_STRING_TO_DOUBLE:
+        bne $t2, 1, __reset_STRING_TO_DOUBLE
+        neg.d $f0, $f0  # f0 = -f0
+
+    __reset_STRING_TO_DOUBLE:
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        lw $t2, 16($sp)
+        lw $t3, 20($sp)        
+        l.d $f30, double_10
+        addi $sp, $sp, -24
+    jr $ra  # Return STRING_TO_FLOAT
 
 ### READ INPUT
 READ_STRING_FROM_USER: # nguyenpanda
@@ -396,8 +662,7 @@ STACK: # nguyenpanda
         # For simplicity, we just halt the program here.
         la $a0, exc_stack_overflow
         jal PRINT_STRING
-        li $v0, 10
-        syscall
+        eret
 
     __STACK_UNDERFLOW:
         # Handle stack underflow (optional)
@@ -405,10 +670,45 @@ STACK: # nguyenpanda
         # For simplicity, we just halt the program here.
         la $a0, exc_stack_underflow
         jal PRINT_STRING
-        li $v0, 10
-        syscall
+        eret
         
 ### PRINT
+PRINT_DOUBLE: # nguyenpanda
+    # PRINT_DOUBLE(double = $f12) => void
+    #   - Print a double to screen
+    # Parameters:
+    #   f12: Display double
+    ##### Init function  #####
+        addi $sp, $sp, -4  # PRINT_DOUBLE: use 2 registers $ra, $f12
+        sw $ra, 0($sp)
+
+    ##### Main function  #####
+        li $v0, 3   # PRINT_DOUBLE
+        syscall
+
+    ##### Reset function  #####
+        lw $ra, 0($sp)
+        addi $sp, $sp, 4
+    jr $ra  # Return PRINT_DOUBLE
+
+PRINT_FLOAT: # nguyenpanda
+    # PRINT_FLOAT(float = $f12) => void
+    #   - Print a float to screen
+    # Parameters:
+    #   f12: Display float
+    ##### Init function  #####
+        addi $sp, $sp, -4  # PRINT_FLOAT: use 2 registers $ra, $f12
+        sw $ra, 0($sp)
+
+    ##### Main function  #####
+        li $v0, 2   # PRINT_FLOAT
+        syscall
+
+    ##### Reset function  #####
+        lw $ra, 0($sp)
+        addi $sp, $sp, 4
+    jr $ra  # Return PRINT_FLOAT
+
 PRINT_STRING: # nguyenpanda
     # PRINT_STRING(string = $a0) => void
     #   - Print a string to screen
@@ -592,7 +892,7 @@ OPERATOR_PRECEDENCE: # nguyenpanda
             addi $sp, $sp, 12
     jr $ra  # Return OPERATOR_PRECEDENCE
 
-OPERATE: # 
+OPERATE: # nguyenpanda
     # OPERATE(operator: char = $a0, operand_0: int = $a1, operand_1: int = $a2) => $v0: int
     #   - Perform an operation
     # Parameters:
@@ -651,7 +951,7 @@ INFIX_TO_POSTFIX: # nguyenpanda
         sw $t0, 8($sp)      # t0 = input string
         sw $t1, 12($sp)     # t1 = string length
         sw $t2, 16($sp)     # t2 = stack
-        sw $t3, 20($sp)     # t3 = result string
+        sw $t3, 20($sp)     # t3 = postfix string
         sw $t4, 24($sp)     # t4 = char
         sw $t5, 28($sp)     # t5 = temp
 
@@ -666,29 +966,29 @@ INFIX_TO_POSTFIX: # nguyenpanda
 
         la $t3, postfix_string
 
-        j __INIT_LOOP
+        j __INIT_LOOP_INFIX_TO_POSTFIX
 
     ##### Main function  #####
         __loop_INFIX_TO_POSTFIX: 
             # print end of loop
-            la $a0, ascii_ddd  # TODO DELETE
-            jal PRINT_STRING  # TODO DELETE
+                # la $a0, ascii_ddd  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
 
-            la $a0, ascii_num_buffer  # TODO DELETE
-            jal PRINT_STRING  # TODO DELETE
-            la $a0, postfix_string  # TODO DELETE
-            jal PRINT_STRING  # TODO DELETE
-            jal new_line  # TODO DELETE
+                # la $a0, ascii_num_buffer  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
+                # la $a0, postfix_string  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
+                # jal new_line  # TODO DELETE
 
-            li $a0, '\t'
-            jal PRINT_CHAR
-            la $a0, stack
-            la $a1, PRINT_CHAR  # Reset postfix string
-            jal PRINT_STACK
+                # li $a0, '\t' # TODO DELETE
+                # jal PRINT_CHAR # TODO DELETE
+                # la $a0, stack # TODO DELETE
+                # la $a1, PRINT_CHAR # TODO DELETE
+                # jal PRINT_STACK # TODO DELETE
 
-        __INIT_LOOP:
-            la $a0, ascii_new_char  # TODO DELETE
-            jal PRINT_STRING  # TODO DELETE
+        __INIT_LOOP_INFIX_TO_POSTFIX:
+            # la $a0, ascii_new_char  # TODO DELETE
+            # jal PRINT_STRING  # TODO DELETE
 
             # for char in infix:
             lb $t4, 0($t0)
@@ -697,25 +997,25 @@ INFIX_TO_POSTFIX: # nguyenpanda
             addiu $t0, $t0, 1
             
             ### PRINT INFO
-                la $a0, ascii_for_char  # TODO DELETE
-                jal PRINT_STRING  # TODO DELETE
-                jal YELLOW  # TODO DELETE
-                move $a0, $t4   # TODO DELETE
-                jal PRINT_CHAR  # TODO DELETE
-                jal RESET   # TODO DELETE
-                jal new_line    # TODO DELETE
+                # la $a0, ascii_for_char  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
+                # jal YELLOW  # TODO DELETE
+                # move $a0, $t4   # TODO DELETE
+                # jal PRINT_CHAR  # TODO DELETE
+                # jal RESET   # TODO DELETE
+                # jal new_line    # TODO DELETE
 
-                la $a0, ascii_num_buffer  # TODO DELETE
-                jal PRINT_STRING  # TODO DELETE
-                la $a0, postfix_string  # TODO DELETE
-                jal PRINT_STRING  # TODO DELETE
-                jal new_line  # TODO DELETE
+                # la $a0, ascii_num_buffer  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
+                # la $a0, postfix_string  # TODO DELETE
+                # jal PRINT_STRING  # TODO DELETE
+                # jal new_line  # TODO DELETE
 
-                li $a0, '\t' # TODO DELETE
-                jal PRINT_CHAR # TODO DELETE
-                la $a0, stack # TODO DELETE
-                la $a1, PRINT_CHAR  # Reset postfix string
-                jal PRINT_STACK # TODO DELETE
+                # li $a0, '\t' # TODO DELETE
+                # jal PRINT_CHAR # TODO DELETE
+                # la $a0, stack # TODO DELETE
+                # la $a1, PRINT_CHAR  # Reset postfix string
+                # jal PRINT_STACK # TODO DELETE
 
             # if (isOperand(char)): include '0' to '9', 'M', and '.'
             move $a0, $t4
@@ -748,7 +1048,7 @@ INFIX_TO_POSTFIX: # nguyenpanda
                 jal PRINT_CHAR
                 jal RESET
                 jal new_line
-                j END_PROGRAM
+                eret
         
         j __loop_INFIX_TO_POSTFIX
 
@@ -912,7 +1212,7 @@ INFIX_TO_POSTFIX: # nguyenpanda
             jal PRINT_INT
             jal RESET
             jal new_line
-            j END_PROGRAM
+            eret
 
     ##### Reset function #####
     __RESET_INFIX_TO_POSTFIX:
@@ -932,54 +1232,153 @@ INFIX_TO_POSTFIX: # nguyenpanda
         addi $sp, $sp, 32
     jr $ra  # Return INFIX_TO_POSTFIX
 
-
-EVALUATE_INFIX: # nguyenpanda
-    # EVALUATE_INFIX(infix: str = $a0) => $f30: float
-    #   - Convert an infix expression to a postfix expression
+EVALUATE_POSTFIX: # nguyenpanda
+    # EVALUATE_POSTFIX(infix: str = $a0) => $f30: float
+    #   - Evaluate a postfix expression
+    #   - The function convert all int -> float to calculate
     # Parameters:
-    #   a0: Infix expression
+    #   a0: Postfix expression
     ##### Init function  #####
-        addi $sp, $sp, -44  # EVALUATE_INFIX: use 4 registers $ra, $a0, $t0, $t1
+        addi $sp, $sp, -32  # EVALUATE_POSTFIX: use 8 registers $ra, $a0, $t0, $t1, $t2, $t3, $t4, $t5
         sw $ra, 0($sp)
         sw $a0, 4($sp)
-        sw $t0, 8($sp)      # t0 = input string
+        sw $t0, 8($sp)      # t0 = postfix string
         sw $t1, 12($sp)     # t1 = string length
-        sw $t2, 16($sp)     # t2 = operator
-        sw $t3, 20($sp)     # t3 = operand  
-        sw $t4, 24($sp)     # t4 = index of the current character
-        sw $t5, 28($sp)     # t5 = index of the current operator
-        sw $t6, 32($sp)     # t6 = index of the current operand
-        sw $t7, 36($sp)     # t7 = index of the postfix expression
-        sw $t8, 40($sp)     # t8 = index of the current operator stack
-        sw $t9, 44($sp)     # t9 = index of the current operand stack
-        # sw $t10, 48($sp)    # t1 = index of the current postfix expression
-        
-        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        sw $t2, 16($sp)     # t2 = stack
+        sw $t3, 20($sp)     # t3 = number buffer
+        sw $t4, 24($sp)     # t4 = 
+        sw $t5, 28($sp)     # t5 = 
 
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
         jal STRING_LENGHT
         move $t1, $v0
-        blt $t1, 1, __invalid_len__EVALUATE_INFIX   # If length < 1, jump to exception
-        bgt $t1, 100, __invalid_len__EVALUATE_INFIX # If length > 100, jump to exception
+        la $t2, stack
+        la $t3, number_buffer
 
-        li $t2, 0           # Init operator stack
-        li $t3, 0           # Init operand stack
-        li $t4, 0           # Init index of the current character
-        li $t5, 0           # Init index of the current operator
-        li $t6, 0           # Init index of the current operand
-        li $t7, 0           # Init index of the postfix expression
-        li $t8, 0           # Init index of the current operator stack
-        li $t9, 0           # Init index of the current operand stack
-        # li $t10, 0          # Init index of the current postfix expression
-    
+        ### Print input
+            jal YELLOW # TODO DELETE
+            la $a0, ascii_postfix # TODO DELETE
+            jal PRINT_STRING # TODO DELETE
+            jal RESET # TODO DELETE
+            jal MAGENTA # TODO DELETE
+            move $a0, $t0 # TODO DELETE
+            jal PRINT_STRING # TODO DELETE
+            jal RESET # TODO DELETE
+            jal new_line # TODO DELETE
+
+        j __INIT_EVALUATE_POSTFIX
     ##### Main function  #####
+        __loop_EVALUATE_POSTFIX: 
+            # print end of loop
+            la $a0, ascii_ddd  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            la $a0, ascii_num_buffer  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            la $a0, number_buffer # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            jal new_line  # TODO DELETE
+
+            li $a0, '\t' # TODO DELETE
+            jal PRINT_CHAR # TODO DELETE
+            la $a0, stack # TODO DELETE
+            la $a1, PRINT_CHAR # TODO DELETE
+            jal PRINT_STACK # TODO DELETE
+        
+        __INIT_EVALUATE_POSTFIX:
+            la $a0, ascii_new_char  # TODO DELETE
+            jal PRINT_STRING        # TODO DELETE
+
+            # for char in infix:
+            lb $t4, 0($t0)
+            beq $t4, 0, __RESET_EVALUATE_POSTFIX
+            beq $t4, '\n', __RESET_EVALUATE_POSTFIX
+            addiu $t0, $t0, 1
+
+            ### PRINT INFO
+                la $a0, ascii_for_char  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal YELLOW  # TODO DELETE
+                move $a0, $t4   # TODO DELETE
+                jal PRINT_CHAR  # TODO DELETE
+                jal RESET   # TODO DELETE
+                jal new_line    # TODO DELETE
+
+                la $a0, ascii_num_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                la $a0, number_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal new_line  # TODO DELETE
+
+                li $a0, '\t' # TODO DELETE
+                jal PRINT_CHAR # TODO DELETE
+                la $a0, stack # TODO DELETE
+                la $a1, PRINT_CHAR  # Reset postfix string
+                jal PRINT_STACK # TODO DELETE
+
+            beq $t4, 'M', __M_EVALUATE_POSTFIX
+            
+            move $a0, $t4
+            jal IS_OPERAND
+            beq $v0, 1, __operand_EVALUATE_POSTFIX
+
+            beq $t4, ' ', __space_EVALUATE_POSTFIX
+
+            # else:
+            la $a0, ascii_num_buffer
+            jal STRING_LENGHT
+            bne $v0, 0, __number_buffer_not_empty_postfix__EVALUATE_INFIX
+
+            beq $t4, '+', __plus__EVALUATE_INFIX
+            beq $t4, '-', __minus__EVALUATE_INFIX
+            beq $t4, '*', __multiply__EVALUATE_INFIX
+            beq $t4, '/', __divide__EVALUATE_INFIX
+            beq $t4, '!', __factorial__EVALUATE_INFIX
+            beq $t4, '^', __exponent__EVALUATE_INFIX
+
+            j __invalid_postfix__EVALUATE_INFIX
+
+    ### If/else if ###
+        __M_EVALUATE_POSTFIX:
+            la $a0, ascii_num_buffer
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __operand_EVALUATE_POSTFIX:
+
+            j __loop_EVALUATE_POSTFIX
+
+        __space_EVALUATE_POSTFIX:
+
+            j __loop_EVALUATE_POSTFIX
+    
+    ### Else ###
+        __number_buffer_not_empty_postfix__EVALUATE_INFIX:
+        __plus__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __minus__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __multiply__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __divide__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __factorial__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
+
+        __exponent__EVALUATE_INFIX:
+            
+            j __loop_EVALUATE_POSTFIX
 
 
-    ##### Reset function #####
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        lw $t0, 8($sp)
-        lw $t1, 12($sp)
-        addi $sp, $sp, 16
     ### Exception function ###
         __invalid_len__EVALUATE_INFIX:
             jal RED
@@ -988,7 +1387,48 @@ EVALUATE_INFIX: # nguyenpanda
             move $a0, $t0
             jal PRINT_INT
             jal RESET
-            j END_PROGRAM
+            eret
+
+        __invalid_postfix__EVALUATE_INFIX:
+            la $a0, exc_invalid_postfix_expression
+            jal PRINT_STRING
+            eret
+
+    ##### Reset function #####
+    __RESET_EVALUATE_POSTFIX:
+        ### If number buffer is not empty
+            la $a0, number_buffer
+            jal STRING_LENGHT
+            beq $v0, 0, __check_before_return__EVALUATE_INFIX
+            la $a0, number_buffer
+            #### CONVERT TO FLOAT
+
+
+        __check_before_return__EVALUATE_INFIX:
+            move $a0, $t2
+            jal STACK_LENGTH
+            bne $v0, 1, __invalid_postfix__EVALUATE_INFIX
+        
+        ### RETURN
+            move $a0, $t2
+            jal STACK_TOP
+            ##### REMEMBER TO CONVERT
+
+        move $a0, $t2       # Reset stack
+        jal STACK_RESET
+
+        la $a0, number_buffer  # Reset number buffer
+        jal RESET_STRING
+
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        lw $t2, 16($sp)
+        lw $t3, 20($sp)
+        lw $t4, 24($sp)
+        lw $t5, 28($sp)
+        addi $sp, $sp, 32
     jr $ra  # Return EVALUATE_INFIX
 
 ### MATH
@@ -1078,7 +1518,7 @@ FACTORIAL: # nguyenpanda
         jal PRINT_INT
         jal RESET
         jal new_line
-        j END_PROGRAM   # Return __exception_FACTORIAL
+        eret
 
 ADDITION: # nguyenpanda
     # ADDITION(int_0 = $a0, int_1 = $a1) => $v0: float
@@ -1243,7 +1683,7 @@ RESET_STRING: # nguyenpanda
     # Parameters:
     #   $a0: Address of the string, argument PASS BY REFERENCE
     ##### Init function  #####
-        addi $sp, $sp, -4       # RESET_STRING: use 1 register $ra
+        addi $sp, $sp, -16       # RESET_STRING: use 1 register $ra
         sw $ra, 0($sp)
         sw $a0, 4($sp)
         sw $t0, 8($sp)          # t0 = string
@@ -1266,7 +1706,7 @@ RESET_STRING: # nguyenpanda
         lw $t0, 8($sp)
         lw $a0, 4($sp)
         lw $ra, 0($sp)
-        addi $sp, $sp, 4
+        addi $sp, $sp, 16
     jr $ra  # Return RESET_STRING
 
 ### UTILS
@@ -1338,7 +1778,7 @@ WRITE_TO_FILE_: # nguyenpanda
             la $a0, exc_write_to_file_invalid_mode
             jal PRINT_STRING
             jal RESET
-            j END_PROGRAM
+            eret
 
     ##### Reset function #####
         __RESET_WRITE_TO_FILE_:
@@ -1401,7 +1841,7 @@ WRITE_TO_FILE: # nguyenpanda
             la $a0, exc_write_to_file_invalid_mode
             jal PRINT_STRING
             jal RESET
-            j END_PROGRAM
+            eret
 
     ##### Reset function #####
         __RESET_WRITE_TO_FILE:
@@ -1412,7 +1852,6 @@ WRITE_TO_FILE: # nguyenpanda
             lw $t0, 0($sp)
             addi $sp, $sp, 20
     jr $ra  # Return WRITE_TO_FILE
-
 
 new_line: # RestingKiwi
     li $v0, 11    # new_line
@@ -1555,9 +1994,6 @@ TEST_STACK_PUSH: # nguyenpanda
     j END_PROGRAM
 
 TEST_MAIN:
-    la $a0, stack
-    jal STACK_INIT
-
     main_loop_TEST_MAIN: # Loop and ask user to input
         ##### Init main  #####
             # Print "Please insert your expression: "
@@ -1585,17 +2021,32 @@ TEST_MAIN:
             jal new_line
 
         #####    MAIN    #####
-            la $a0, input_string        # Load address of input buffer
-            jal INFIX_TO_POSTFIX        # Evaluate the infix expression
+            la $a0, input_string        # Evaluate the infix expression
+            jal INFIX_TO_POSTFIX
 
+            # Print "Postfix: "
             jal CYAN
-            la $a0, ascii_postfix
+            la $a0, ascii_postfix       
             jal PRINT_STRING
             jal RESET
-
-            la $a0, postfix_string      # Load address of the postfix expression
-            jal PRINT_STRING            # Print the postfix expression
+            
+            # Print the postfix expression
+            la $a0, postfix_string
+            jal PRINT_STRING
             jal new_line
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
+            # Evaluate the postfix expression
+            # la $a0, postfix_string
+            # jal EVALUATE_POSTFIX
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
 
         ##### Write file #####
             # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
@@ -1607,6 +2058,59 @@ TEST_MAIN:
         ##### Reset main  #####
             la $a0, postfix_string
             jal RESET_STRING
+
+            la $a0, ascii_num_buffer
+            jal RESET_STRING
     j main_loop_TEST_MAIN
 
 TEST_MAIN_2:
+TEST_STRING_TO_DOUBLE:
+    la $a0, input_string
+    li $a1, 102
+    jal READ_STRING_FROM_USER
+
+    la $a0, input_string
+    jal STRING_TO_DOUBLE
+    mfc1 $t0, $f0
+    jal PRINT_DOUBLE
+
+    jr $ra
+
+    # li $v0, 8
+	# la $a0, input_string
+	# li $a1, 100
+	# syscall
+
+    # la $a0, input_string
+    # jal STRING_TO_DOUBLE
+    # mov.d $f12, $f0
+    # jal PRINT_DOUBLE
+	
+	# li $v0, 59
+    # la $a0, ascii_out_prompt
+    # la $a1, input_string
+    # syscall
+	
+    # jal TEST_STRING_TO_DOUBLE
+
+TEST_DOUBLE_TO_STRING:
+	l.d $f24, double_test
+    l.d $f26, double_0
+    l.d $f28, double_1
+    l.d $f30, double_10
+	
+	mov.d $f12, $f24
+    jal DOUBLE_TO_STRING
+
+    jal YELLOW
+    la $a0, ascii_out_prompt
+    jal PRINT_STRING
+    jal RESET
+
+    jal CYAN
+    la $a0, number_buffer
+    jal PRINT_STRING
+    jal RESET
+    jal new_line
+
+    j END_PROGRAM

@@ -1,37 +1,41 @@
 # spim .asm
 .data
-    filename:   .asciiz "calc_log.txt"
+    ## Variables
+        # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
+        stack:              .space 208 # Stack
+        
+        input_string:       .space 104 # MAX LENGTH OF INPUT STRING IS 100
+        postfix_string:     .space 304 # MAX LENGTH OF POSTFIX STRING IS 300
+        number_buffer:      .space 104 # Buffer for number
 
-    ## Array
-        # arr_byte_valid:     .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '*', '/', '.', 'M', '^', '!', '(', ')'
-        # arr_byte_operator:  .byte '+', '-', '*', '/', '^', 'M', '!', '(', ')'
-        # arr_byte_number:    .byte '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
-        arr_byte_operator:  .byte '+', '-', '*', '/', '^', '!'
+    ### file    
+        filename:   .asciiz "calc_log.txt"
 
     ## String
+        ascii_check_point:  .asciiz "Check point: "
+        ascii_new_char:     .asciiz "\033[1;92m----------------------------\033[0m\n"
+        ascii_ddd:          .asciiz "\t---\n"
+        ascii_num_buffer:   .asciiz "\tNumber buffer: "
+        ascii_for_char:     .asciiz "Getting info for: "
         quit_string:        .asciiz "quit"
-        ascii_out_prompt:   .asciiz "Result: "
+        ascii_out_prompt:   .asciiz "Input: "
+        ascii_postfix:      .asciiz "Postfix: "
         ascii_in_prompt:    .asciiz "Please insert your expression: "
         ascii_quit_prompt:  .asciiz "You have typed 'quit'.\n"
         ascii_exit_prompt:  .asciiz "Exiting program...!\n"
         ascii_stack_top:	.asciiz "<-TOP (Length="
         ascii_write_result: .asciiz ","
+        ascii_section:      .asciiz "\033[1;91m####################################################\033[0m\n"
 
     ## Exception
         # exc_divide_by_zero:         .asciiz "Error: Divide by zero\n"
-        # exc_inval_input:            .asciiz "Error: Invalid input\n"
-        # exc_inval_expression:       .asciiz "Error: Invalid expression\n"
-        # exc_inval_operator:         .asciiz "Error: Invalid operator\n"
-        # exc_inval_number:           .asciiz "Error: Invalid number\n"
-        # exc_inval_parenthesis:      .asciiz "Error: Invalid parenthesis\n"
-        # exc_inval_factorial:        .asciiz "Error: Invalid factorial\n"
-        # exc_inval_power:            .asciiz "Error: Invalid power\n"
-        # exc_inval_logarithm:        .asciiz "Error: Invalid logarithm\n"
+        exc_invalid_character:          .asciiz "Error: Invalid character at position="
+        exc_invalid_postfix_expression: .asciiz "\033[1;91mError: Invalid postfix expression\n\033[0m"
         exc_inval_length_expression:    .asciiz "Error: Expression length must >= 1 or <= 100, got length="
-        factorial_out_of_bound:         .asciiz "Error: Factorial's argument must less than 16, got n="
-        write_to_file_invalid_mode:     .asciiz "WRITE_TO_FILE only accept 'w' ($a2=1) or 'a' ($a2=9) mode, got="
-        ascii_stack_overflow:           .asciiz "Stack overflow!\n"
-        ascii_stack_underflow:          .asciiz "Stack underflow!\n"
+        exc_factorial_out_of_bound:     .asciiz "Error: Factorial's argument must less than 16, got n="
+        exc_write_to_file_invalid_mode: .asciiz "WRITE_TO_FILE only accept 'w' ($a2=1) or 'a' ($a2=9) mode, got="
+        exc_stack_overflow:             .asciiz "Stack overflow!\n"
+        exc_stack_underflow:            .asciiz "Stack underflow!\n"
     
     ## Color
         color_r: .asciiz "\033[1;91m" 	# Red color escape sequence
@@ -42,25 +46,12 @@
         color_c: .asciiz "\033[1;96m" 	# Cyan color escape sequence
         color_w: .asciiz "\033[1;97m" 	# White color escape sequence
         reset:   .asciiz "\033[0m" 	    # Reset color escape sequence
-
-    ## Variables
-        # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
-        stack_test:         .word 52 # Stack for tesing
-        stack_operand:      .word 52 # Stack for INFIX_TO_POSTFIX
-        stack_operator:     .word 52 # Stack for EVALUATE_POSTFIX
-        
-        input_string:       .space 101 # MAX LENGTH OF INPUT STRING IS 100
         
 .text
     .globl  main
     
 main:
     jal TEST_MAIN
-    # li $a0, 10
-    # jal INT_TO_FLOAT
-    # mov.s $f0, $f30
-    # mfc1 $t2, $f30
-    
 j END_PROGRAM
 
 ### READ INPUT
@@ -93,7 +84,8 @@ STACK: # nguyenpanda
     
     STACK_INIT: # nguyenpanda
         # STACK_INIT(stack_pointer $a0) => void
-        #   - Initialize the stack
+        #   - Initialize the stack by setting top_pointer to the first element and length to 0
+        #   - Noted that data in the stack won't be reset when calling this function
         # Parameters:
         #   a0: stack_pointer
         ##### Init function  #####
@@ -405,7 +397,7 @@ STACK: # nguyenpanda
         # Handle stack overflow (optional)
         # This could involve printing an error message and exiting the program.
         # For simplicity, we just halt the program here.
-        la $a0, ascii_stack_overflow
+        la $a0, exc_stack_overflow
         jal PRINT_STRING
         li $v0, 10
         syscall
@@ -414,7 +406,7 @@ STACK: # nguyenpanda
         # Handle stack underflow (optional)
         # This could involve printing an error message and exiting the program.
         # For simplicity, we just halt the program here.
-        la $a0, ascii_stack_underflow
+        la $a0, exc_stack_underflow
         jal PRINT_STRING
         li $v0, 10
         syscall
@@ -498,9 +490,10 @@ IS_OPERAND: # nguyenpanda
         li $v0, 0           # Assume that character is not an operand
 
     ##### Main function  #####
-        beq $t0, 46, __IS_OPERAND_RETURN_TRUE # If character is '.', return true
-        blt $t0, 48, __IS_OPERAND_RETURN_FALSE # If character < '0', return false
-        bgt $t0, 57, __IS_OPERAND_RETURN_FALSE # If character > '9', return false
+        beq $t0, '.', __IS_OPERAND_RETURN_TRUE  # If character is '.', return true
+        beq $t0, 'M', __IS_OPERAND_RETURN_TRUE  # If character is '.', return true
+        blt $t0, '0', __IS_OPERAND_RETURN_FALSE # If character < '0', return false
+        bgt $t0, '9', __IS_OPERAND_RETURN_FALSE # If character > '9', return false
         __IS_OPERAND_RETURN_TRUE:
             addi $v0, $zero, 1  # Return true
 
@@ -530,15 +523,17 @@ IS_OPERATOR: # nguyenpanda
         li $v0, 0           # Assume that character is not an operator
     
     ##### Main function  #####
-        beq $t0, 43, __IS_OPERATOR_RETURN_TRUE # If character is '+', return true
-        beq $t0, 45, __IS_OPERATOR_RETURN_TRUE # If character is '-', return true
-        beq $t0, 42, __IS_OPERATOR_RETURN_TRUE # If character is '*', return true
-        beq $t0, 47, __IS_OPERATOR_RETURN_TRUE # If character is '/', return true
-        beq $t0, 94, __IS_OPERATOR_RETURN_TRUE # If character is '^', return true
-        beq $t0, 33, __IS_OPERATOR_RETURN_TRUE # If character is '!', return true
-    j __IS_OPERATOR_RESET
-    __IS_OPERATOR_RETURN_TRUE:
-        li $v0, 1   # Return true
+        beq $t0, '+', __IS_OPERATOR_RETURN_TRUE # If character is '+', return true
+        beq $t0, '-', __IS_OPERATOR_RETURN_TRUE # If character is '-', return true
+        beq $t0, '*', __IS_OPERATOR_RETURN_TRUE # If character is '*', return true
+        beq $t0, '/', __IS_OPERATOR_RETURN_TRUE # If character is '/', return true
+        beq $t0, '^', __IS_OPERATOR_RETURN_TRUE # If character is '^', return true
+        beq $t0, '!', __IS_OPERATOR_RETURN_TRUE # If character is '!', return true
+        
+        j __IS_OPERATOR_RESET
+        
+        __IS_OPERATOR_RETURN_TRUE:
+            li $v0, 1   # Return true
 
     ##### Reset function #####
     __IS_OPERATOR_RESET:
@@ -546,7 +541,7 @@ IS_OPERATOR: # nguyenpanda
         lw $a0, 4($sp)
         lw $t0, 8($sp)
         lw $t1, 12($sp)
-        add $sp, $sp, 16
+        addi $sp, $sp, 16
     jr $ra  # Return IS_OPERATOR
 
 OPERATOR_PRECEDENCE: # nguyenpanda
@@ -565,14 +560,14 @@ OPERATOR_PRECEDENCE: # nguyenpanda
         li $v0, -1              # Assume that operator is not valid
 
     ##### Main function  #####
-        beq $t0, 43, __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '+', return 1
-        beq $t0, 45, __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '-', return 1
+        beq $t0, '+', __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '+', return 1
+        beq $t0, '-', __OPERATOR_PRECEDENCE_RETURN_1 # If operator is '-', return 1
         
-        beq $t0, 42, __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '*', return 2
-        beq $t0, 47, __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '/', return 2
+        beq $t0, '*', __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '*', return 2
+        beq $t0, '/', __OPERATOR_PRECEDENCE_RETURN_2 # If operator is '/', return 2
 
-        beq $t0, 94, __OPERATOR_PRECEDENCE_RETURN_3 # If operator is '^', return 3
-        beq $t0, 33, __OPERATOR_PRECEDENCE_RETURN_4 # If operator is '!', return 4
+        beq $t0, '^', __OPERATOR_PRECEDENCE_RETURN_3 # If operator is '^', return 3
+        beq $t0, '!', __OPERATOR_PRECEDENCE_RETURN_4 # If operator is '!', return 4
 
         j __OPERATOR_PRECEDENCE_RESET
     ##### Return functions #####
@@ -645,54 +640,388 @@ OPERATE: #
         # __OPERATE_DIVISION:
         #     div $v0, $a1, $a2
 
-
-EVALUATE_INFIX: # nguyenpanda
-    # EVALUATE_INFIX(infix: str = $a0) => $f30: float
+INFIX_TO_POSTFIX: # nguyenpanda
+    # INFIX_TO_POSTFIX($a0 = string) -> $v0 = string
     #   - Convert an infix expression to a postfix expression
     # Parameters:
     #   a0: Infix expression
+    # Return:
+    #   v0: Postfix expression
     ##### Init function  #####
-        addi $sp, $sp, -44  # EVALUATE_INFIX: use 4 registers $ra, $a0, $t0, $t1
+        addi $sp, $sp, -32  # INFIX_TO_POSTFIX: use 4 registers $ra, $a0, $t0, $t1
         sw $ra, 0($sp)
         sw $a0, 4($sp)
         sw $t0, 8($sp)      # t0 = input string
         sw $t1, 12($sp)     # t1 = string length
-        sw $t2, 16($sp)     # t2 = operator
-        sw $t3, 20($sp)     # t3 = operand  
-        sw $t4, 24($sp)     # t4 = index of the current character
-        sw $t5, 28($sp)     # t5 = index of the current operator
-        sw $t6, 32($sp)     # t6 = index of the current operand
-        sw $t7, 36($sp)     # t7 = index of the postfix expression
-        sw $t8, 40($sp)     # t8 = index of the current operator stack
-        sw $t9, 44($sp)     # t9 = index of the current operand stack
-        # sw $t10, 48($sp)    # t1 = index of the current postfix expression
-        
+        sw $t2, 16($sp)     # t2 = stack
+        sw $t3, 20($sp)     # t3 = postfix string
+        sw $t4, 24($sp)     # t4 = char
+        sw $t5, 28($sp)     # t5 = temp
+
         move $t0, $a0       # SUPPORT PASS BY REFERENCE
 
         jal STRING_LENGHT
         move $t1, $v0
-        blt $t1, 1, __invalid_len__EVALUATE_INFIX   # If length < 1, jump to exception
-        bgt $t1, 100, __invalid_len__EVALUATE_INFIX # If length > 100, jump to exception
+        blt $t1, 001, __invalid_len_INFIX_TO_POSTFIX    # If length < 001, jump to exception
+        bgt $t1, 100, __invalid_len_INFIX_TO_POSTFIX    # If length > 100, jump to exception
 
-        li $t2, 0           # Init operator stack
-        li $t3, 0           # Init operand stack
-        li $t4, 0           # Init index of the current character
-        li $t5, 0           # Init index of the current operator
-        li $t6, 0           # Init index of the current operand
-        li $t7, 0           # Init index of the postfix expression
-        li $t8, 0           # Init index of the current operator stack
-        li $t9, 0           # Init index of the current operand stack
-        # li $t10, 0          # Init index of the current postfix expression
-    
+        la $t2, stack
+
+        la $t3, postfix_string
+
+        j __INIT_LOOP_INFIX_TO_POSTFIX
+
     ##### Main function  #####
+        __loop_INFIX_TO_POSTFIX: 
+            # print end of loop
+            la $a0, ascii_ddd  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
 
+            la $a0, ascii_num_buffer  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            la $a0, postfix_string  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            jal new_line  # TODO DELETE
+
+            li $a0, '\t'
+            jal PRINT_CHAR
+            la $a0, stack
+            la $a1, PRINT_CHAR  # Reset postfix string
+            jal PRINT_STACK
+
+        __INIT_LOOP_INFIX_TO_POSTFIX:
+            la $a0, ascii_new_char  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            # for char in infix:
+            lb $t4, 0($t0)
+            beq $t4, 0, __while_INFIX_TO_POSTFIX
+            beq $t4, '\n', __while_INFIX_TO_POSTFIX
+            addiu $t0, $t0, 1
+            
+            ### PRINT INFO
+                la $a0, ascii_for_char  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal YELLOW  # TODO DELETE
+                move $a0, $t4   # TODO DELETE
+                jal PRINT_CHAR  # TODO DELETE
+                jal RESET   # TODO DELETE
+                jal new_line    # TODO DELETE
+
+                la $a0, ascii_num_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                la $a0, postfix_string  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal new_line  # TODO DELETE
+
+                li $a0, '\t' # TODO DELETE
+                jal PRINT_CHAR # TODO DELETE
+                la $a0, stack # TODO DELETE
+                la $a1, PRINT_CHAR  # Reset postfix string
+                jal PRINT_STACK # TODO DELETE
+
+            # if (isOperand(char)): include '0' to '9', 'M', and '.'
+            move $a0, $t4
+            jal IS_OPERAND
+            beq $v0 1, __operand_INFIX_TO_POSTFIX
+            
+            # elif char == ' '
+            beq $t4, ' ', __loop_INFIX_TO_POSTFIX
+            
+            # elif char == '('
+            beq $t4, '(', __left_parenthesis_INFIX_TO_POSTFIX
+            
+            # elif char == ')'
+            beq $t4, ')', __right_parenthesis_INFIX_TO_POSTFIX
+            
+            # elif (isOperator(char)):
+            move $a0, $t4
+            jal IS_OPERATOR
+            beq $v0, 1, __operator_INFIX_TO_POSTFIX
+            
+            # else:
+                jal RED
+                la $a0, exc_invalid_character
+                jal PRINT_STRING
+                move $a0, $t0
+                jal PRINT_INT
+                li $a0, '-'
+                jal PRINT_CHAR
+                lb $a0, 0($t0)
+                jal PRINT_CHAR
+                jal RESET
+                jal new_line
+                j END_PROGRAM
+        
+        j __loop_INFIX_TO_POSTFIX
+
+        __while_INFIX_TO_POSTFIX:
+            # while stack:
+            move $a0, $t2
+            jal STACK_LENGTH
+            beq $v0, 0, __RESET_INFIX_TO_POSTFIX
+
+            li $a0, ' '
+            sb $a0, 0($t3)
+            addiu $t3, $t3, 1
+
+            # result += stack.pop()
+            move $a0, $t2
+            jal STACK_POP
+            sb $v0, 0($t3)
+            addiu $t3, $t3, 1
+            j __while_INFIX_TO_POSTFIX
+
+    ##### If/else if/else #####
+        __operand_INFIX_TO_POSTFIX:
+            sb $t4, 0($t3)
+            addiu $t3, $t3, 1
+            j __loop_INFIX_TO_POSTFIX
+
+        __left_parenthesis_INFIX_TO_POSTFIX:
+            move $a0, $t2
+            move $a1, $t4
+            jal STACK_PUSH
+            j __loop_INFIX_TO_POSTFIX
+
+        __right_parenthesis_INFIX_TO_POSTFIX:
+            __while_right_parenthesis_INFIX_TO_POSTFIX:
+                # while stack and stack[-1] != '(':
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __if_right_parenthesis_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                beq $v0, '(', __if_right_parenthesis_INFIX_TO_POSTFIX
+
+                li $t4, ' '
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                
+                jal STACK_POP
+                sb $v0, 0($t3)
+                addiu $t3, $t3, 1
+
+                j __while_right_parenthesis_INFIX_TO_POSTFIX    
+            __if_right_parenthesis_INFIX_TO_POSTFIX:
+                # if stack and stack[-1] == '(':
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __loop_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                bne $v0, '(', __loop_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_POP
+            j __loop_INFIX_TO_POSTFIX
+
+        __operator_INFIX_TO_POSTFIX:
+            __check_exclamation__operator_INFIX_TO_POSTFIX:
+                bne $t4, '!', __check_minus__operator_INFIX_TO_POSTFIX
+                li $t4, ' '
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                li $t4, '!'
+                sb $t4, 0($t3)
+                addiu $t3, $t3, 1
+                j __loop_INFIX_TO_POSTFIX
+
+            __check_minus__operator_INFIX_TO_POSTFIX:
+                # if (char == '-' 
+                # and (result.isNotEmpty or result[-1] in ('(', ' ', '*', '/', '^'))
+                # and (stack.isNotEmpty or stack[-1] in ('(', ' ', '*', '/', '^'))):
+                bne $t4, '-', __while_operator_INFIX_TO_POSTFIX
+
+                la $a0, postfix_string
+                jal STRING_LENGHT
+                beq $v0, 0, __next_and__operator_INFIX_TO_POSTFIX
+                
+                addi $v0, $v0, -1
+                lb $t5, postfix_string($v0)
+                beq $t5, '(', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, ' ', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '*', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '/', __next_and__operator_INFIX_TO_POSTFIX
+                beq $t5, '^', __next_and__operator_INFIX_TO_POSTFIX
+
+                j __while_operator_INFIX_TO_POSTFIX
+
+                __do_minus__operator_INFIX_TO_POSTFIX:
+                    sb $t4, 0($t3)  # result += '-'
+                    addiu $t3, $t3, 1
+                    j __loop_INFIX_TO_POSTFIX
+
+                __next_and__operator_INFIX_TO_POSTFIX:
+                    move $a0, $t2
+                    jal STACK_LENGTH
+                    beq $v0, 0, __do_minus__operator_INFIX_TO_POSTFIX
+
+                    move $a0, $t2
+                    jal STACK_TOP
+                    beq $v0, '(', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, ' ', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '*', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '/', __do_minus__operator_INFIX_TO_POSTFIX
+                    beq $v0, '^', __do_minus__operator_INFIX_TO_POSTFIX
+            
+            __while_operator_INFIX_TO_POSTFIX:
+                # while stack and isOperator(stacxk[-1]) != '(' and operator_precedence(char) <= operator_precedence(stack[-1]):
+                move $a0, $t2
+                jal STACK_LENGTH
+                beq $v0, 0, __end_while_operator_INFIX_TO_POSTFIX
+
+                move $a0, $t2
+                jal STACK_TOP
+                beq $v0, '(', __end_while_operator_INFIX_TO_POSTFIX
+
+                move $a0, $v0
+                jal OPERATOR_PRECEDENCE
+                move $t5, $v0
+
+                move $a0, $t4
+                jal OPERATOR_PRECEDENCE
+                blt $t5, $v0, __end_while_operator_INFIX_TO_POSTFIX
+
+                li $t5, ' '
+                sb $t5, 0($t3)
+                addiu $t3, $t3, 1
+
+                move $a0, $t2
+                jal STACK_POP
+                sb $v0, 0($t3)
+                addiu $t3, $t3, 1
+
+                j __while_operator_INFIX_TO_POSTFIX
+            __end_while_operator_INFIX_TO_POSTFIX:
+
+            move $a0, $t2
+            move $a1, $t4
+            jal STACK_PUSH
+            
+            li $t4, ' '
+            sb $t4, 0($t3)
+            addiu $t3, $t3, 1
+            j __loop_INFIX_TO_POSTFIX
+
+    ##### Exception function #####
+        __invalid_len_INFIX_TO_POSTFIX:
+            jal RED
+            la $a0, exc_inval_length_expression
+            jal PRINT_STRING
+            move $a0, $t1
+            jal PRINT_INT
+            jal RESET
+            jal new_line
+            j END_PROGRAM
 
     ##### Reset function #####
+    __RESET_INFIX_TO_POSTFIX:
+        sb $zero, 0($t3)    # Add null terminator
+        la $a0, stack       # Reset stack
+        jal STACK_RESET
+        move $v0, $t3
+
         lw $ra, 0($sp)
         lw $a0, 4($sp)
         lw $t0, 8($sp)
         lw $t1, 12($sp)
-        addi $sp, $sp, 16
+        lw $t2, 16($sp)
+        lw $t3, 20($sp)
+        lw $t4, 24($sp)
+        lw $t5, 28($sp)
+        addi $sp, $sp, 32
+    jr $ra  # Return INFIX_TO_POSTFIX
+
+EVALUATE_POSTFIX: # nguyenpanda
+    # EVALUATE_POSTFIX(infix: str = $a0) => $f30: float
+    #   - Evaluate a postfix expression
+    #   - The function convert all int -> float to calculate
+    # Parameters:
+    #   a0: Postfix expression
+    ##### Init function  #####
+        addi $sp, $sp, -32  # EVALUATE_POSTFIX: use 8 registers $ra, $a0, $t0, $t1, $t2, $t3, $t4, $t5
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)      # t0 = postfix string
+        sw $t1, 12($sp)     # t1 = string length
+        sw $t2, 16($sp)     # t2 = stack
+        sw $t3, 20($sp)     # t3 = number buffer
+        sw $t4, 24($sp)     # t4 = 
+        sw $t5, 28($sp)     # t5 = 
+
+        move $t0, $a0       # SUPPORT PASS BY REFERENCE
+        jal STRING_LENGHT
+        move $t1, $v0
+        la $t2, stack
+        la $t3, number_buffer
+
+        ### Print input
+            jal YELLOW # TODO DELETE
+            la $a0, ascii_postfix # TODO DELETE
+            jal PRINT_STRING # TODO DELETE
+            jal RESET # TODO DELETE
+            jal MAGENTA # TODO DELETE
+            move $a0, $t0 # TODO DELETE
+            jal PRINT_STRING # TODO DELETE
+            jal RESET # TODO DELETE
+            jal new_line # TODO DELETE
+
+        j __INIT_EVALUATE_POSTFIX
+    ##### Main function  #####
+        __loop_EVALUATE_POSTFIX: 
+            # print end of loop
+            la $a0, ascii_ddd  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            la $a0, ascii_num_buffer  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            la $a0, number_buffer # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+            jal new_line  # TODO DELETE
+
+            li $a0, '\t' # TODO DELETE
+            jal PRINT_CHAR # TODO DELETE
+            la $a0, stack # TODO DELETE
+            la $a1, PRINT_CHAR # TODO DELETE
+            jal PRINT_STACK # TODO DELETE
+        
+        __INIT_EVALUATE_POSTFIX:
+            la $a0, ascii_new_char  # TODO DELETE
+            jal PRINT_STRING  # TODO DELETE
+
+            # for char in infix:
+            lb $t4, 0($t0)
+            beq $t4, 0, __RESET_EVALUATE_POSTFIX
+            beq $t4, '\n', __RESET_EVALUATE_POSTFIX
+            addiu $t0, $t0, 1
+
+            ### PRINT INFO
+                la $a0, ascii_for_char  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal YELLOW  # TODO DELETE
+                move $a0, $t4   # TODO DELETE
+                jal PRINT_CHAR  # TODO DELETE
+                jal RESET   # TODO DELETE
+                jal new_line    # TODO DELETE
+
+                la $a0, ascii_num_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                la $a0, number_buffer  # TODO DELETE
+                jal PRINT_STRING  # TODO DELETE
+                jal new_line  # TODO DELETE
+
+                li $a0, '\t' # TODO DELETE
+                jal PRINT_CHAR # TODO DELETE
+                la $a0, stack # TODO DELETE
+                la $a1, PRINT_CHAR  # Reset postfix string
+                jal PRINT_STACK # TODO DELETE
+
+            
+            j __loop_EVALUATE_POSTFIX
+
     ### Exception function ###
         __invalid_len__EVALUATE_INFIX:
             jal RED
@@ -702,6 +1031,47 @@ EVALUATE_INFIX: # nguyenpanda
             jal PRINT_INT
             jal RESET
             j END_PROGRAM
+
+        __invalid_postfix__EVALUATE_INFIX:
+            la $a0, exc_invalid_postfix_expression
+            jal PRINT_STRING
+            j END_PROGRAM
+
+    ##### Reset function #####
+    __RESET_EVALUATE_POSTFIX:
+        ### 
+            la $a0, num_buffer
+            jal STRING_LENGHT
+            bne $v0, 0, __check_before_return__EVALUATE_INFIX
+            la $a0, number_buffer
+            #### CONVERT TO FLOAT
+
+
+        __check_before_return__EVALUATE_INFIX:
+            la $a0, $t2
+            jal STACK_LENGTH
+            bne $v0, 1, __invalid_postfix__EVALUATE_INFIX
+        
+        ### RETURN
+            move $a0, $t2
+            jal STACK_TOP
+            ##### REMEMBER TO CONVERT
+
+        la $a0, $t2       # Reset stack
+        jal STACK_RESET
+
+        la $a0, number_buffer  # Reset number buffer
+        jal RESET_STRING
+
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        lw $t0, 8($sp)
+        lw $t1, 12($sp)
+        lw $t2, 16($sp)
+        lw $t3, 20($sp)
+        lw $t4, 24($sp)
+        lw $t5, 28($sp)
+        addi $sp, $sp, 32
     jr $ra  # Return EVALUATE_INFIX
 
 ### MATH
@@ -950,6 +1320,38 @@ COMPARE_STRING: # nguyenpanda
             addi $sp, $sp, 20
     jr $ra  # Return COMPARE_STRING
 
+RESET_STRING: # nguyenpanda
+    # RESET_STRING(string = $a0) => void
+    #   - Reset a string to null character
+    # Parameters:
+    #   $a0: Address of the string, argument PASS BY REFERENCE
+    ##### Init function  #####
+        addi $sp, $sp, -4       # RESET_STRING: use 1 register $ra
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+        sw $t0, 8($sp)          # t0 = string
+        sw $t1, 12($sp)         # t1 = null character
+
+    ##### Main function  #####
+        move $t0, $a0           # SUPPORT PASS BY REFERENCE
+        li $t1, 0               # t1 = null character
+
+        __loop_RESET_STRING:
+            sb $t1, 0($t0)      # str[t0] = null character
+            addiu $t0, $t0, 1   # str[t0++] Move to next character
+            lb $t2, 0($t0)      # t2 = str[t0] Load character from memory
+            beq $t2, $zero, __end_loop_RESET_STRING    # If character is null, end loop
+        j __loop_RESET_STRING
+
+    ##### Reset function #####
+    __end_loop_RESET_STRING:
+        lw $t1, 12($sp)
+        lw $t0, 8($sp)
+        lw $a0, 4($sp)
+        lw $ra, 0($sp)
+        addi $sp, $sp, 4
+    jr $ra  # Return RESET_STRING
+
 ### UTILS
 END_PROGRAM: # nguyenpanda
     jal YELLOW                  # END_PROGRAM
@@ -1016,7 +1418,7 @@ WRITE_TO_FILE_: # nguyenpanda
     ##### Exception #####
         __INVALID_MODE_WRITE_TO_FILE_:
             jal RED
-            la $a0, write_to_file_invalid_mode
+            la $a0, exc_write_to_file_invalid_mode
             jal PRINT_STRING
             jal RESET
             j END_PROGRAM
@@ -1079,7 +1481,7 @@ WRITE_TO_FILE: # nguyenpanda
     ##### Exception #####
         __INVALID_MODE_WRITE_TO_FILE:
             jal RED
-            la $a0, write_to_file_invalid_mode
+            la $a0, exc_write_to_file_invalid_mode
             jal PRINT_STRING
             jal RESET
             j END_PROGRAM
@@ -1093,7 +1495,6 @@ WRITE_TO_FILE: # nguyenpanda
             lw $t0, 0($sp)
             addi $sp, $sp, 20
     jr $ra  # Return WRITE_TO_FILE
-
 
 new_line: # RestingKiwi
     li $v0, 11    # new_line
@@ -1153,7 +1554,7 @@ COLOR: # nguyenpanda
 
 ### TEST
 TEST_STACK: # nguyenpanda
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_INIT
 
     li $a1, 'H'
@@ -1186,7 +1587,7 @@ TEST_STACK: # nguyenpanda
     la $a1, PRINT_CHAR
     jal PRINT_STACK
 
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_POP
     move $a0, $v0
     la $a1, PRINT_CHAR
@@ -1194,24 +1595,24 @@ TEST_STACK: # nguyenpanda
 
     jal new_line
 
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_POP
     move $a0, $v0
     jal PRINT_CHAR
 
     jal new_line
 
-    la $a0, stack_test
+    la $a0, stack
     la $a1, PRINT_CHAR
     jal PRINT_STACK
 
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_TOP
     move $a0, $v0
     jal PRINT_CHAR
     jal new_line
 
-    la $a0, stack_test
+    la $a0, stack
     jal STACK_RESET
 
     la $a1, PRINT_CHAR
@@ -1221,7 +1622,7 @@ TEST_STACK: # nguyenpanda
     j END_PROGRAM
 
 TEST_STACK_PUSH: # nguyenpanda
-    la $a0, stack_test
+    la $a0, stack
     jal STACK
 
     li $a1, 1
@@ -1236,6 +1637,9 @@ TEST_STACK_PUSH: # nguyenpanda
     j END_PROGRAM
 
 TEST_MAIN:
+    la $a0, stack
+    jal STACK_INIT
+
     main_loop_TEST_MAIN: # Loop and ask user to input
         ##### Init main  #####
             # Print "Please insert your expression: "
@@ -1246,7 +1650,7 @@ TEST_MAIN:
 
             # Read input from user
             la $a0, input_string        # Load address of input buffer
-            li $a1, 100                 # Set max length of input buffer (1 space for null character)
+            li $a1, 102                 # Set max length of input buffer (1 space for null character)
             jal READ_STRING_FROM_USER   # Read input from user
 
             # 'quit' check
@@ -1260,10 +1664,35 @@ TEST_MAIN:
             la $a0, ascii_out_prompt    # Load address of output prompt
             jal PRINT_STRING            # Print output prompt
             jal RESET
+            jal new_line
 
         #####    MAIN    #####
-            la $a0, input_string        # Load address of input buffer
-            jal EVALUATE_INFIX          # Evaluate the infix expression
+            la $a0, input_string        # Evaluate the infix expression
+            jal INFIX_TO_POSTFIX
+
+            # Print "Postfix: "
+            jal CYAN
+            la $a0, ascii_postfix       
+            jal PRINT_STRING
+            jal RESET
+            
+            # Print the postfix expression
+            la $a0, postfix_string
+            jal PRINT_STRING
+            jal new_line
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
+            # Evaluate the postfix expression
+            la $a0, postfix_string
+            jal EVALUATE_POSTFIX
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
 
         ##### Write file #####
             # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
@@ -1272,84 +1701,12 @@ TEST_MAIN:
             li $a2, 9                   # Mode 9: write only with create and append
             jal WRITE_TO_FILE           # Write the input string to the file
 
-            # la $a0, input_string        # Load address of input buffer
-            # la $a1, filename            # Load address of the filename
-            # li $a2, 9                   # Mode 9: write only with create and append
-            # jal WRITE_TO_FILE           # Write the input string to the file
-        
-        ##### Reset main #####
-            la $a0, stack_operand
-            jal STACK_RESET
+        ##### Reset main  #####
+            la $a0, postfix_string
+            jal RESET_STRING
 
-            la $a0, stack_operator
-            jal STACK_RESET
+            la $a0, ascii_num_buffer
+            jal RESET_STRING
     j main_loop_TEST_MAIN
 
 TEST_MAIN_2:
-    # Print "Please insert your expression: "
-    main_loop_TEST_MAIN_2:
-        jal CYAN
-        la $a0, ascii_in_prompt     # Load address of input prompt
-        jal PRINT_STRING            # Print input prompt
-        jal RESET
-
-        # Read input from user
-        la $a0, input_string        # Load address of input buffer
-        li $a1, 100                 # Set max length of input buffer (1 space for null character)
-        jal READ_STRING_FROM_USER   # Read input from user
-
-        # 'quit' check
-        la $a0, quit_string         # Load address of quit string
-        la $a1, input_string        # Load address of user input
-        jal COMPARE_STRING          # Compare 2 strings
-        beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
-
-        # Print "Result: "
-        jal CYAN
-        la $a0, ascii_out_prompt    # Load address of output prompt
-        jal PRINT_STRING            # Print output prompt
-        jal RESET
-
-        # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
-        la $a0, input_string        # Load address of input buffer
-        la $a1, filename            # Load address of the filename
-        li $a2, 9                   # Mode 9: write only with create and append
-        jal WRITE_TO_FILE           # Write the input string to the file
-
-        # Print input_string
-        la $a0, input_string        # Print user input
-        jal PRINT_STRING
-        
-        # Use to check if a character is an operator/operand
-        li $t0, 0                   # Index of the current character
-        li $t2, 0                   # counter of the number of operators
-        li $t3, 0                   # counter of the number of not operators
-
-        __loop_TEST_MAIN_2:
-            lb $t1, input_string($t0)   # Load character from input_string
-            addi $t0, $t0, 1            # Move to next character
-            beq $t1, $zero, __out_loop_TEST_MAIN_2    # If character is null, end loop
-            beq $t1, 10, __out_loop_TEST_MAIN_2     # If character is new line, end loop
-            move $a0, $t1               # Move character to $a0
-            jal IS_OPERATOR             # Check if character is an operator
-            beq $v0, 1, __if_operator_TEST_MAIN_2     # If character is an operator, jump to is_operator
-            addi $t3, $t3, 1
-        j __loop_TEST_MAIN_2
-
-        __if_operator_TEST_MAIN_2:
-            addi $t2, $t2, 1
-            j __loop_TEST_MAIN_2
-
-        __out_loop_TEST_MAIN_2:
-            move $a0, $t2
-            jal PRINT_INT
-
-            li $a0, '-'
-            jal PRINT_CHAR
-
-            move $a0, $t3
-            jal PRINT_INT
-
-            jal new_line
-
-    j main_loop_TEST_MAIN_2
