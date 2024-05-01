@@ -1,7 +1,7 @@
 # Return    $f0 - $f3   |   4s/2d
 # Temporary $f4 - $f11  |   8s/4d
 # Argument  $f12 - $f15 |   4s/2d
-# Temporary $f16 - $f23 |   8s/4d
+# Temporary $f16 - $f19 |   4s/2d
 # Constant  $f24 - $f31 |   8s/4d
 
 import csv
@@ -113,10 +113,8 @@ def infixToPostfix(string: str, M: int):
 def evaluate_postfix(expression: str, M: int):
     # t0 = postfix string
     # t1 = string length
-    # t2 = stack
-    # t3 = number buffer
-    # t4 = 
-    # t5 = 
+    # t3 = temp
+    # t4 = char
     stack = []
     number = ''
 
@@ -219,8 +217,8 @@ def test_csv(filename, output):
     else: print(f'\033[1;91m{false_case} case are wrong in {case} test cases\033[0m')
 
 if __name__ == '__main__':
-    test_csv('data.csv', 'test_case.csv')
-    # test_csv('temp.csv', 'test_case.csv')
+    # test_csv('data.csv', 'test_case.csv')
+    test_csv('temp.csv', 'test_case.csv')
 
     # M = 10
     # while True:

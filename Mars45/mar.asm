@@ -2,7 +2,10 @@
 .data
     ## Variables
         M:                  .space 8   # M
-        test_num:           .word 100   # 1.0
+        operand1:           .space 8   # Operand 1
+        operand2:           .space 8   # Operand 2
+        temp_operand:       .space 8   # Temporary operand
+        test_num:           .word 100  # 1.0
         # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
         stack:              .space 208 # Stack
         
@@ -63,9 +66,8 @@
 
 main:
     jal INIT_MAIN
-
-    # j TEST_DOUBLE_TO_STRING
     j TEST_MAIN
+    # j TEST_STACK_DOUBLE_METHOD
 j END_PROGRAM
 
 INIT_MAIN:
@@ -81,7 +83,7 @@ INIT_MAIN:
     l.d $f28, double_1
     l.d $f30, double_10
     
-    s.d $f30, M
+    s.d $f24, M
 
     lw $ra, 0($sp)
     lw $a0, 4($sp)
@@ -89,6 +91,47 @@ INIT_MAIN:
     jr $ra
 
 #### DOUBLE
+LOAD_DOUBLE: # nguyenpanda
+    # LOAD_DOUBLE(address = $a0) => $f0
+    #   - Load a double from memory address as follow IEEE 754 format
+    # Parameters:
+    #   a0: Address
+    # Return:
+    #   f0: Double
+    ##### Init function  #####
+        addi $sp, $sp, -8  # LOAD_DOUBLE: use 2 registers $ra, $a0
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+
+    ##### Main function  #####
+        l.d $f0, 0($a0)
+
+    ##### Reset function  #####
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        addi $sp, $sp, 8
+    jr $ra  # Return LOAD_DOUBLE
+
+SAVE_DOUBLE: # nguyenpanda
+    # SAVE_DOUBLE(double = $f12, address = $a0) => void
+    #   - Save a double to memory address as follow IEEE 754 format
+    # Parameters:
+    #   f12: Double
+    #   a0: Address
+    ##### Init function  #####
+        addi $sp, $sp, -8  # SAVE_DOUBLE: use 2 registers $ra, $a0
+        sw $ra, 0($sp)
+        sw $a0, 4($sp)
+
+    ##### Main function  #####
+        s.d $f12, 0($a0)
+
+    ##### Reset function  #####
+        lw $ra, 0($sp)
+        lw $a0, 4($sp)
+        addi $sp, $sp, 8
+    jr $ra  # Return SAVE_DOUBLE
+
 DOUBLE_TO_STRING: # nguyenpanda
     # DOUBLE_TO_STRING(string_buffer = $a0, += mode = $a1, double = $f12) => $v0, $v1
     #   - Convert a double to a string stored in string_buffer
@@ -111,11 +154,17 @@ DOUBLE_TO_STRING: # nguyenpanda
         sw $t4, 20($sp) # temp count
         sw $t5, 24($sp) # temp count
         sw $t6, 28($sp) # temp count
-        sw $a0, 32($sp)
-        sw $a1, 40($sp) # temp count
+        sw $a0, 32($sp) # string_buffer
+        sw $a1, 40($sp) # += mode (0: replace, 1: +=)
 
         move $t0, $a0
-        beq $a1, 0, __next_init_DOUBLE_TO_STRING
+
+        bne $a1, 0, __adding_mode_DOUBLE_TO_STRING
+            # Replace mode
+            jal RESET_STRING
+            j __next_init_DOUBLE_TO_STRING
+        __adding_mode_DOUBLE_TO_STRING:
+            # += mode
             jal STRING_LENGHT
             add $t0, $t0, $v0
         __next_init_DOUBLE_TO_STRING:
@@ -173,7 +222,6 @@ DOUBLE_TO_STRING: # nguyenpanda
         li $t6, -1
 
         __loop_count_0_DOUBLE_TO_STRING:
-
             mul $t5, $t5, 10
             addi $t6, $t6, 1
             blt $t5, $t4, __loop_count_0_DOUBLE_TO_STRING
@@ -544,7 +592,99 @@ STACK: # nguyenpanda
             lw $t3, 20($sp)
             addi $sp, $sp, 24
         jr $ra  # Return STACK_POP
+    #### FOR DOUBLE
+    STACK_PUSH_DOUBLE: # nguyenpanda
+        # STACK_PUSH_DOUBLE(stack_pointet = $a0, double = $f12) => void
+        #   - Push a double to stack
+        # Parameters:
+        #   a0: stack_pointer
+        #   f12: double
+        ##### Init function  #####
+            addi $sp, $sp, -16  # STACK_PUSH_DOUBLE: use 5 registers $ra, $a0, $a1, $t0, $t1
+            sw $ra, 0($sp)
+            sw $a1, 4($sp)
+            sw $t0, 8($sp)  # double
+            sw $t1, 12($sp) # double
 
+            mfc1.d $t0, $f12
+
+        ##### Main function  #####
+            move $a1, $t0
+            jal STACK_PUSH
+            move $a1, $t1
+            jal STACK_PUSH
+
+        ##### Reset function  #####
+            lw $ra, 0($sp)
+            lw $a1, 4($sp)
+            lw $t0, 8($sp)
+            lw $t1, 12($sp)
+            addi $sp, $sp, 16
+        jr $ra  # Return STACK_PUSH_DOUBLE
+
+    STACK_POP_DOUBLE: # nguyenpanda
+        # STACK_POP_DOUBLE(stack_pointer = $a0) => $f0: double
+        #   - Pop a double from stack
+        # Parameters:
+        #   a0: stack_pointer
+        # Return:
+        #   f0: double
+        ##### Init function  #####
+            addi $sp, $sp, -12  # STACK_POP_DOUBLE: use 5 registers $ra, $a0, $a1, $t0, $t1
+            sw $ra, 0($sp)
+            sw $t0, 4($sp)  # double
+            sw $t1, 8($sp)  # double
+
+        ##### Main function  #####
+            # MUST POP IN REVERSE ORDER
+            jal STACK_POP
+            move $t1, $v0
+            jal STACK_POP
+            move $t0, $v0
+
+            mtc1.d $t0, $f0
+        ##### Reset function  #####
+            lw $ra, 0($sp)
+            lw $t0, 4($sp)
+            lw $t1, 8($sp)
+            addi $sp, $sp, 12
+        jr $ra  # Return STACK_POP_DOUBLE
+
+    STACK_LENGTH_DOUBLE: # nguyenpanda
+        # STACK_LENGTH_DOUBLE(stack_pointer = $a0) => $v0: int
+        #   - Get the length of the stack
+        # Parameters:
+        #   a0: stack_pointer
+        # Return:
+        #   v0: length
+        ##### Init function  #####
+            addi $sp, $sp, -8  # STACK_LENGTH_DOUBLE: use 2 registers $ra, $a0
+            sw $ra, 0($sp)
+            sw $t0, 4($sp)
+            
+            li $t0, 2
+        
+        ##### Main function  #####
+            jal STACK_LENGTH
+            div $v0, $t0
+            mfhi $t0        # $t0 = $v0 / 2
+            bne $t0, $zero, __exception_STACK_LENGTH_DOUBLE # Check for stack underflow (length is not even)
+            j __RESET_STACK_LENGTH_DOUBLE
+
+        ##### Exception function #####
+            __exception_STACK_LENGTH_DOUBLE:
+                eret
+
+        ##### Reset function  #####
+        __RESET_STACK_LENGTH_DOUBLE:
+            mflo $v0       # $v0 = $v0 / 2
+            lw $ra, 0($sp)
+            lw $t0, 4($sp)
+            addi $sp, $sp, 8
+        jr $ra  # Return STACK_LENGTH_DOUBLE
+    PRINT_STACK_DOUBLE:
+
+    #### 
     STACK_RESET:
         # STACK_RESET(stack_pointer $a0) => void
         #   - Reset the stack
@@ -1247,42 +1387,25 @@ INFIX_TO_POSTFIX: # nguyenpanda
     jr $ra  # Return INFIX_TO_POSTFIX
 
 EVALUATE_POSTFIX: # nguyenpanda
-    # EVALUATE_POSTFIX(infix: str = $a0) => $f30: float
+    # EVALUATE_POSTFIX(infix: str = $a0) => $f0: float
     #   - Evaluate a postfix expression
     #   - The function convert all int -> float to calculate
     # Parameters:
     #   a0: Postfix expression
     ##### Init function  #####
-        addi $sp, $sp, -32  # EVALUATE_POSTFIX: use 8 registers $ra, $a0, $t0, $t1, $t2, $t3, $t4, $t5
+        addi $sp, $sp, -20  # EVALUATE_POSTFIX: use 8 registers $ra, $a0, $t0, $t1, $t2, $t3, $t4, $t5
         sw $ra, 0($sp)
         sw $a0, 4($sp)
         sw $t0, 8($sp)      # t0 = postfix string
-        sw $t1, 12($sp)     # t1 = string length
-        sw $t2, 16($sp)     # t2 = stack
-        sw $t3, 20($sp)     # t3 = number buffer
-        sw $t4, 24($sp)     # t4 = 
-        sw $t5, 28($sp)     # t5 = 
+        sw $t3, 12($sp)     # t3 = temp
+        sw $t4, 16($sp)     # t4 = char
 
         move $t0, $a0       # SUPPORT PASS BY REFERENCE
-        jal STRING_LENGHT
-        move $t1, $v0
         la $t2, stack
-        la $t3, number_buffer
-
-        ### Print input
-            jal YELLOW # TODO DELETE
-            la $a0, ascii_postfix # TODO DELETE
-            jal PRINT_STRING # TODO DELETE
-            jal RESET # TODO DELETE
-            jal MAGENTA # TODO DELETE
-            move $a0, $t0 # TODO DELETE
-            jal PRINT_STRING # TODO DELETE
-            jal RESET # TODO DELETE
-            jal new_line # TODO DELETE
 
         j __INIT_EVALUATE_POSTFIX
     ##### Main function  #####
-        __loop_EVALUATE_POSTFIX: 
+        __loop_EVALUATE_POSTFIX:
             # print end of loop
             la $a0, ascii_ddd  # TODO DELETE
             jal PRINT_STRING  # TODO DELETE
@@ -1292,108 +1415,206 @@ EVALUATE_POSTFIX: # nguyenpanda
             la $a0, number_buffer # TODO DELETE
             jal PRINT_STRING  # TODO DELETE
             jal new_line  # TODO DELETE
-
-            li $a0, '\t' # TODO DELETE
-            jal PRINT_CHAR # TODO DELETE
-            la $a0, stack # TODO DELETE
-            la $a1, PRINT_CHAR # TODO DELETE
-            jal PRINT_STACK # TODO DELETE
         
         __INIT_EVALUATE_POSTFIX:
             la $a0, ascii_new_char  # TODO DELETE
             jal PRINT_STRING        # TODO DELETE
 
             # for char in infix:
-            lb $t4, 0($t0)
-            beq $t4, 0, __RESET_EVALUATE_POSTFIX
-            beq $t4, '\n', __RESET_EVALUATE_POSTFIX
+            lb $t4, 0($t0) # BREAKPOINT
+            beq $t4, 0, __END_LOOP_EVALUATE_POSTFIX
+            beq $t4, '\n', __END_LOOP_EVALUATE_POSTFIX
             addiu $t0, $t0, 1
 
             ### PRINT INFO
+                # "Getting info for: "
                 la $a0, ascii_for_char  # TODO DELETE
                 jal PRINT_STRING  # TODO DELETE
                 jal YELLOW  # TODO DELETE
+
+                # for i in char
                 move $a0, $t4   # TODO DELETE
                 jal PRINT_CHAR  # TODO DELETE
                 jal RESET   # TODO DELETE
                 jal new_line    # TODO DELETE
 
+                # "Number buffer: "
                 la $a0, ascii_num_buffer  # TODO DELETE
                 jal PRINT_STRING  # TODO DELETE
+
+                # Value of number_buffer
                 la $a0, number_buffer  # TODO DELETE
                 jal PRINT_STRING  # TODO DELETE
                 jal new_line  # TODO DELETE
 
-                li $a0, '\t' # TODO DELETE
-                jal PRINT_CHAR # TODO DELETE
-                la $a0, stack # TODO DELETE
-                la $a1, PRINT_CHAR  # Reset postfix string
-                jal PRINT_STACK # TODO DELETE
-
-            beq $t4, 'M', __M_EVALUATE_POSTFIX
+            beq $t4, 'M', __M_EVALUATE_POSTFIX # BREAKPOINT
             
             move $a0, $t4
             jal IS_OPERAND
-            beq $v0, 1, __operand_EVALUATE_POSTFIX
-
-            beq $t4, ' ', __space_EVALUATE_POSTFIX
+            beq $v0, 1, __do_operand_EVALUATE_POSTFIX # BREAKPOINT
+            beq $t4, '-', __operand_EVALUATE_POSTFIX # BREAKPOINT
+            
+            __check_space__EVALUATE_POSTFIX:
+            beq $t4, ' ', __space_EVALUATE_POSTFIX # BREAKPOINT
 
             # else:
-            la $a0, number_buffer
-            jal STRING_LENGHT
-            bne $v0, 0, __number_buffer_not_empty_postfix__EVALUATE_INFIX
+                la $a0, number_buffer
+                jal STRING_LENGHT
+                bne $v0, 0, __number_buffer_not_empty_postfix__EVALUATE_INFIX # BREAKPOINT
 
-            beq $t4, '+', __plus__EVALUATE_INFIX
-            beq $t4, '-', __minus__EVALUATE_INFIX
-            beq $t4, '*', __multiply__EVALUATE_INFIX
-            beq $t4, '/', __divide__EVALUATE_INFIX
-            beq $t4, '!', __factorial__EVALUATE_INFIX
-            beq $t4, '^', __exponent__EVALUATE_INFIX
+                __check_operator__EVALUATE_POSTFIX:
+                beq $t4, '+', __plus__EVALUATE_INFIX # BREAKPOINT
+                beq $t4, '-', __minus__EVALUATE_INFIX # BREAKPOINT
+                beq $t4, '*', __multiply__EVALUATE_INFIX # BREAKPOINT
+                beq $t4, '/', __divide__EVALUATE_INFIX # BREAKPOINT
+                beq $t4, '!', __factorial__EVALUATE_INFIX # BREAKPOINT
+                beq $t4, '^', __exponent__EVALUATE_INFIX # BREAKPOINT
 
             j __invalid_postfix__EVALUATE_INFIX
+
+        __END_LOOP_EVALUATE_POSTFIX: 
+            la $a0, number_buffer # if number: stack.append(float(number))
+            jal STRING_LENGHT
+            beq $v0, 0, __check_stack_len_EVALUATE_POSTFIX # BREAKPOINT
+
+            la $a0, number_buffer
+            jal STRING_TO_DOUBLE
+            
+            la $a0, stack
+            mov.d $f12, $f0
+            jal STACK_PUSH_DOUBLE # BREAKPOINT
+
+        __check_stack_len_EVALUATE_POSTFIX:
+            la $a0, stack # if len(stack) != 1: raise ValueError("Invalid expression")
+            jal STACK_LENGTH_DOUBLE
+            bne $v0, 1, __invalid_postfix__EVALUATE_INFIX # BREAKPOINT
+            # j END_PROGRAM # CHECKPOINT
+        j __RESET_EVALUATE_POSTFIX
 
     ### If/else if ###
         __M_EVALUATE_POSTFIX:
             la $a0, number_buffer
             li $a1, 1
             l.d $f12, M
-            jal STRING_TO_DOUBLE
-            j END_PROGRAM
+            jal DOUBLE_TO_STRING
             j __loop_EVALUATE_POSTFIX
 
         __operand_EVALUATE_POSTFIX:
-
-            j __loop_EVALUATE_POSTFIX
+            la $a0, stack
+            jal STACK_LENGTH_DOUBLE
+            bge $v0, 2, __check_space__EVALUATE_POSTFIX
+            __do_operand_EVALUATE_POSTFIX:
+                la $a0, number_buffer
+                jal STRING_LENGHT
+                add $t3, $v0, $a0 # BREAKPOINT
+                sb $t4, 0($t3)
+                # j END_PROGRAM
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
         __space_EVALUATE_POSTFIX:
+            la $a0, number_buffer
+            jal STRING_LENGHT
+            beq $v0, 0, __loop_EVALUATE_POSTFIX # BREAKPOINT
 
-            j __loop_EVALUATE_POSTFIX
+            ### Print info
+            
+            bne $t4, '-', __else__space_EVALUATE_POSTFIX # BREAKPOINT
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f16, $f0 # $f16 = operand 2
+
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f18, $f0 # $f18 = operand 1
+
+                sub.d $f12, $f18, $f16 # $f12 = operand 1 - operand 2
+                jal STACK_PUSH_DOUBLE
+
+                j __end_else__space_EVALUATE_POSTFIX
+            __else__space_EVALUATE_POSTFIX:
+                la $a0, number_buffer
+                jal STRING_TO_DOUBLE
+                # $f0 = double(nyumber_buffer)
+                la $a0, stack # BREAKPOINT
+                mov.d $f12, $f0
+                jal STACK_PUSH_DOUBLE
+            __end_else__space_EVALUATE_POSTFIX:
+            la $a0, number_buffer
+            jal RESET_STRING
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
     
     ### Else ###
         __number_buffer_not_empty_postfix__EVALUATE_INFIX:
+            la $a0, number_buffer
+            jal STRING_TO_DOUBLE
+            # $f0 = double(nyumber_buffer)
+            la $a0, stack
+            mov.d $f12, $f0
+            jal STACK_PUSH_DOUBLE
+
+            la $a0, number_buffer
+            jal RESET_STRING
+            j __check_operator__EVALUATE_POSTFIX # BREAKPOINT
+
         __plus__EVALUATE_INFIX:
-            
-            j __loop_EVALUATE_POSTFIX
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f16, $f0 # $f16 = operand 2
+
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f18, $f0 # $f18 = operand 1
+
+                add.d $f12, $f18, $f16 # $f12 = operand 1 + operand 2
+                jal STACK_PUSH_DOUBLE
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
         __minus__EVALUATE_INFIX:
-            
-            j __loop_EVALUATE_POSTFIX
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f16, $f0 # $f16 = operand 2
+
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f18, $f0 # $f18 = operand 1
+
+                sub.d $f12, $f18, $f16 # $f12 = operand 1 - operand 2
+                jal STACK_PUSH_DOUBLE
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
         __multiply__EVALUATE_INFIX:
-            
-            j __loop_EVALUATE_POSTFIX
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f16, $f0 # $f16 = operand 2
 
-        __divide__EVALUATE_INFIX:
-            
-            j __loop_EVALUATE_POSTFIX
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f18, $f0 # $f18 = operand 1
+
+                mul.d $f12, $f18, $f16 # $f12 = operand 1 * operand 2
+                jal STACK_PUSH_DOUBLE
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
+
+        __divide__EVALUATE_INFIX: # TODO NOT DONE ZERO DIVISION
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f16, $f0 # $f16 = operand 2
+
+                la $a0, stack
+                jal STACK_POP_DOUBLE
+                mov.d $f18, $f0 # $f18 = operand 1
+
+                div.d $f12, $f18, $f16 # $f12 = operand 1 * operand 2
+                jal STACK_PUSH_DOUBLE
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
         __factorial__EVALUATE_INFIX:
             
-            j __loop_EVALUATE_POSTFIX
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
         __exponent__EVALUATE_INFIX:
             
-            j __loop_EVALUATE_POSTFIX
+            j __loop_EVALUATE_POSTFIX # BREAKPOINT
 
 
     ### Exception function ###
@@ -1413,25 +1634,10 @@ EVALUATE_POSTFIX: # nguyenpanda
 
     ##### Reset function #####
     __RESET_EVALUATE_POSTFIX:
-        ### If number buffer is not empty
-            la $a0, number_buffer
-            jal STRING_LENGHT
-            beq $v0, 0, __check_before_return__EVALUATE_INFIX
-            la $a0, number_buffer
-            #### CONVERT TO FLOAT
+        la $a0, stack
+        jal STACK_POP_DOUBLE
 
-
-        __check_before_return__EVALUATE_INFIX:
-            move $a0, $t2
-            jal STACK_LENGTH
-            bne $v0, 1, __invalid_postfix__EVALUATE_INFIX
-        
-        ### RETURN
-            move $a0, $t2
-            jal STACK_TOP
-            ##### REMEMBER TO CONVERT
-
-        move $a0, $t2       # Reset stack
+        la $a0, stack
         jal STACK_RESET
 
         la $a0, number_buffer  # Reset number buffer
@@ -1440,12 +1646,17 @@ EVALUATE_POSTFIX: # nguyenpanda
         lw $ra, 0($sp)
         lw $a0, 4($sp)
         lw $t0, 8($sp)
-        lw $t1, 12($sp)
-        lw $t2, 16($sp)
-        lw $t3, 20($sp)
-        lw $t4, 24($sp)
-        lw $t5, 28($sp)
-        addi $sp, $sp, 32
+        lw $t3, 12($sp)
+        lw $t4, 16($sp)
+        addi $sp, $sp, 20
+
+        jal MAGENTA
+        mov.d $f12, $f0
+        jal PRINT_DOUBLE
+        jal RESET
+        jal new_line
+
+        j END_PROGRAM
     jr $ra  # Return EVALUATE_INFIX
 
 ### MATH
@@ -1520,13 +1731,6 @@ FACTORIAL: # nguyenpanda
                 mul $v0, $t0, $v0
         jr $ra      # Return __FACT
 
-    ##### Reset function #####
-    __END_FACTORIAL:
-        lw $t0, 0($sp)
-        lw $ra, 4($sp)
-        addi $sp, $sp, 8
-        jr $ra          # Return FACTORIAL
-    
     __exception_FACTORIAL:
         jal RED         # __exception_FACTORIAL
         # la $a0, factorial_out_of_bound
@@ -1537,57 +1741,12 @@ FACTORIAL: # nguyenpanda
         jal new_line
         eret
 
-ADDITION: # nguyenpanda
-    # ADDITION(int_0 = $a0, int_1 = $a1) => $v0: float
-    #   - Add 2 numbers
-    # Parameters:
-    #   $a0: First number
-    #   $a1: Second number
-    # Return:
-    #   $v0: (First number + Second number)
-    ##### Init function  #####
-    ##### Main function  #####
     ##### Reset function #####
-    jr $ra  # Return ADDITION
-
-SUBSTRACTION: # nguyenpanda
-    # SUBSTRACTION(int_0 = $a0, int_1 = $a1) => $v0: int
-    #   - Substract 2 numbers
-    # Parameters:
-    #   $a0: First number
-    #   $a1: Second number
-    # Return:
-    #   $v0: (First number - Second number)
-    ##### Init function  #####
-    ##### Main function  #####
-    ##### Reset function #####
-    jr $ra  # Return SUBSTRACTION
-
-MULTIPLICATION: # nguyenpanda
-    # MULTIPLICATION(int_0 = $a0, int_1 = $a1) => $v0: int
-    #   - Multilication 2 numbers
-    # Parameters:
-    #   $a0: First number
-    #   $a1: Second number
-    # Return:
-    #   $v0: (First number * Second number)
-    ##### Init function  #####
-    ##### Main function  #####
-    ##### Reset function #####
-    jr $ra  # Return MULTIPLICATION
-
-DIVISION: # nguyenpanda
-    # DIVISION(int_0 = $a0, int_1 = $a1) => $v0: int
-    #   - Division 2 numbers
-    # Parameters:
-    #   $a0: First number
-    #   $a1: Second number
-    # Return:
-    #   $v0: (First number / Second number)
-    ##### Init function  #####
-    ##### Main function  #####
-    ##### Reset function #####
-    jr $ra  # Return DIVISION
+    __END_FACTORIAL:
+        lw $t0, 0($sp)
+        lw $ra, 4($sp)
+        addi $sp, $sp, 8
+    jr $ra          # Return FACTORIAL
 
 EXPONENTIATION: # nguyenpanda
     # EXPONENTIATION(int_0 = $a0, int_1 = $a1) => $v0: int
@@ -2010,7 +2169,81 @@ TEST_STACK_PUSH: # nguyenpanda
     jal PRINT_STACK
     j END_PROGRAM
 
-TEST_MAIN_2:
+TEST_LOAD_SACE_DOUBLE_IEEE:
+    la $a0, operand1
+    mov.d $f12, $f24
+    jal SAVE_DOUBLE
+    
+    la $a0, operand1
+    jal LOAD_DOUBLE
+    mov.d $f16, $f0
+    j END_PROGRAM
+
+TEST_STACK_DOUBLE_METHOD:
+    la $a0, stack
+    mov.d $f12, $f24
+    jal STACK_PUSH_DOUBLE
+
+    la $a0, stack
+    mov.d $f12, $f30
+    jal STACK_PUSH_DOUBLE
+
+    la $a0, stack
+    jal STACK_LENGTH_DOUBLE
+    move $a0, $v0
+    jal PRINT_INT
+    jal new_line
+
+    la $a0, stack
+    mov.d $f12, $f28
+    jal STACK_PUSH_DOUBLE
+
+    la $a0, stack
+    mov.d $f12, $f30
+    jal STACK_PUSH_DOUBLE
+
+    la $a0, stack
+    mov.d $f12, $f24
+    jal STACK_PUSH_DOUBLE
+
+    la $a0, stack
+    jal STACK_LENGTH_DOUBLE
+    move $a0, $v0
+    jal PRINT_INT
+    jal new_line
+    ##########
+    la $a0, stack
+    jal STACK_POP_DOUBLE
+    mov.d $f12, $f0
+    jal PRINT_DOUBLE
+    jal new_line
+
+    la $a0, stack
+    jal STACK_POP_DOUBLE
+    mov.d $f12, $f0
+    jal PRINT_DOUBLE
+    jal new_line
+
+    la $a0, stack
+    jal STACK_POP_DOUBLE
+    mov.d $f12, $f0
+    jal PRINT_DOUBLE
+    jal new_line
+    
+    la $a0, stack
+    jal STACK_POP_DOUBLE
+    mov.d $f12, $f0
+    jal PRINT_DOUBLE
+    jal new_line
+
+    la $a0, stack
+    jal STACK_POP_DOUBLE
+    mov.d $f12, $f0
+    jal PRINT_DOUBLE
+    jal new_line
+    
+    j END_PROGRAM
+
 TEST_STRING_TO_DOUBLE:
     la $a0, input_string
     li $a1, 102
@@ -2102,14 +2335,13 @@ TEST_MAIN:
 
             # Print "Infix: "
             jal CYAN
-            la $a0, ascii_infix_prompt    # Load address of output prompt
+            la $a0, ascii_infix_prompt  # Load address of output prompt
             jal PRINT_STRING            # Print output prompt
             jal RESET
 
             # Print the infix expression
             la $a0, input_string        # Load address of input buffer
             jal PRINT_STRING            # Print the infix expression
-            jal new_line
 
         #####    MAIN    #####
             la $a0, input_string        # Evaluate the infix expression
@@ -2130,15 +2362,15 @@ TEST_MAIN:
             la $a0, ascii_section
             jal PRINT_STRING
 
+            # j END_PROGRAM
             # Evaluate the postfix expression
             la $a0, postfix_string
-            jal EVALUATE_POSTFIX
+            jal EVALUATE_POSTFIX # BREAKPOINT
 
             # Print "############"
             la $a0, ascii_section
             jal PRINT_STRING
-
-
+            
         ##### Write file #####
             # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
             la $a0, input_string        # Load address of input buffer
