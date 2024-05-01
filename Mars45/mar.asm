@@ -1,7 +1,8 @@
 # spim .asm
 .data
     ## Variables
-        test_num:   .word 100 # 1.0
+        M:                  .space 8   # M
+        test_num:           .word 100   # 1.0
         # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
         stack:              .space 208 # Stack
         
@@ -27,7 +28,7 @@
         ascii_num_buffer:   .asciiz "\tNumber buffer: "
         ascii_for_char:     .asciiz "Getting info for: "
         quit_string:        .asciiz "quit"
-        ascii_out_prompt:   .asciiz "Input: "
+        ascii_infix_prompt: .asciiz "Infix: "
         ascii_postfix:      .asciiz "Postfix: "
         ascii_in_prompt:    .asciiz "Please insert your expression: "
         ascii_quit_prompt:  .asciiz "You have typed 'quit'.\n"
@@ -63,38 +64,45 @@
 main:
     jal INIT_MAIN
 
-    j TEST_DOUBLE_TO_STRING
-    # j TEST_MAIN
+    # j TEST_DOUBLE_TO_STRING
+    j TEST_MAIN
 j END_PROGRAM
 
 INIT_MAIN:
-    addi $sp, $sp, -4
+    addi $sp, $sp, -8
     sw $ra, 0($sp)
+    sw $a0, 4($sp)
 
     la $a0, stack
     jal STACK_INIT
 
     l.d $f24, double_test
-    #l.d $f26, double_0
-    #l.d $f28, double_1
-    #l.d $f30, double_10
+    l.d $f26, double_0
+    l.d $f28, double_1
+    l.d $f30, double_10
+    
+    s.d $f30, M
 
     lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $a0, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 #### DOUBLE
 DOUBLE_TO_STRING: # nguyenpanda
-    # DOUBLE_TO_STRING(double = $f12) => $v0, $v1
-    #   - Convert a double to a string
+    # DOUBLE_TO_STRING(string_buffer = $a0, += mode = $a1, double = $f12) => $v0, $v1
+    #   - Convert a double to a string stored in string_buffer
+    #   - The function use 9 registers $ra, $t0, $t1, $t2, $t3, $t4, $t5, $t6, $a0
+    #                      $f16, $f18, $f22 as temporary registers
     # Parameters:
+    #   a0: String buffer
+    #   a1: += mode (0: replace, 1: +=)
     #   f12: Double
     # Return:
     #   v0: Integer string
     #   v1: Decimal string
-    #   number_buffer: String
     ##### Init function #####
-        addi $sp, $sp, -36  # DOUBLE_TO_STRING: use 7 registers $ra, $t0, $t1, $t2, $t3, $t4, $t5
+        addi $sp, $sp, -40  # DOUBLE_TO_STRING: use 7 registers $ra, $t0, $t1, $t2, $t3, $t4, $t5
         sw $ra, 0($sp)
         sw $t0, 4($sp)  # number_buffer
         sw $t1, 8($sp)  # temp_space
@@ -104,8 +112,13 @@ DOUBLE_TO_STRING: # nguyenpanda
         sw $t5, 24($sp) # temp count
         sw $t6, 28($sp) # temp count
         sw $a0, 32($sp)
+        sw $a1, 40($sp) # temp count
 
-        la $t0, number_buffer
+        move $t0, $a0
+        beq $a1, 0, __next_init_DOUBLE_TO_STRING
+            jal STRING_LENGHT
+            add $t0, $t0, $v0
+        __next_init_DOUBLE_TO_STRING:
         la $t1, temp_space
         li $t2, 0       # is_negative = False
         l.d $f22, double_10p6
@@ -224,8 +237,9 @@ DOUBLE_TO_STRING: # nguyenpanda
         lw $t4, 20($sp)
         lw $t5, 24($sp)
         lw $t6, 28($sp)
-        lw $a0, 28($sp)
-        addi $sp, $sp, 36
+        lw $a0, 32($sp)
+        lw $a1, 36($sp)
+        addi $sp, $sp, 40
     jr $ra  # Return DOUBLE_TO_STRING
 
 STRING_TO_DOUBLE: # nguyenpanda
@@ -1325,7 +1339,7 @@ EVALUATE_POSTFIX: # nguyenpanda
             beq $t4, ' ', __space_EVALUATE_POSTFIX
 
             # else:
-            la $a0, ascii_num_buffer
+            la $a0, number_buffer
             jal STRING_LENGHT
             bne $v0, 0, __number_buffer_not_empty_postfix__EVALUATE_INFIX
 
@@ -1340,8 +1354,11 @@ EVALUATE_POSTFIX: # nguyenpanda
 
     ### If/else if ###
         __M_EVALUATE_POSTFIX:
-            la $a0, ascii_num_buffer
-            
+            la $a0, number_buffer
+            li $a1, 1
+            l.d $f12, M
+            jal STRING_TO_DOUBLE
+            j END_PROGRAM
             j __loop_EVALUATE_POSTFIX
 
         __operand_EVALUATE_POSTFIX:
@@ -1993,76 +2010,6 @@ TEST_STACK_PUSH: # nguyenpanda
     jal PRINT_STACK
     j END_PROGRAM
 
-TEST_MAIN:
-    main_loop_TEST_MAIN: # Loop and ask user to input
-        ##### Init main  #####
-            # Print "Please insert your expression: "
-            jal CYAN
-            la $a0, ascii_in_prompt     # Load address of input prompt
-            jal PRINT_STRING            # Print input prompt
-            jal RESET
-
-            # Read input from user
-            la $a0, input_string        # Load address of input buffer
-            li $a1, 102                 # Set max length of input buffer (1 space for null character)
-            jal READ_STRING_FROM_USER   # Read input from user
-
-            # 'quit' check
-            la $a0, quit_string         # Load address of quit string
-            la $a1, input_string        # Load address of user input
-            jal COMPARE_STRING          # Compare 2 strings
-            beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
-
-            # Print "Result: "
-            jal CYAN
-            la $a0, ascii_out_prompt    # Load address of output prompt
-            jal PRINT_STRING            # Print output prompt
-            jal RESET
-            jal new_line
-
-        #####    MAIN    #####
-            la $a0, input_string        # Evaluate the infix expression
-            jal INFIX_TO_POSTFIX
-
-            # Print "Postfix: "
-            jal CYAN
-            la $a0, ascii_postfix       
-            jal PRINT_STRING
-            jal RESET
-            
-            # Print the postfix expression
-            la $a0, postfix_string
-            jal PRINT_STRING
-            jal new_line
-
-            # Print "############"
-            la $a0, ascii_section
-            jal PRINT_STRING
-
-            # Evaluate the postfix expression
-            # la $a0, postfix_string
-            # jal EVALUATE_POSTFIX
-
-            # Print "############"
-            la $a0, ascii_section
-            jal PRINT_STRING
-
-
-        ##### Write file #####
-            # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
-            la $a0, input_string        # Load address of input buffer
-            la $a1, filename            # Load address of the filename
-            li $a2, 9                   # Mode 9: write only with create and append
-            jal WRITE_TO_FILE           # Write the input string to the file
-
-        ##### Reset main  #####
-            la $a0, postfix_string
-            jal RESET_STRING
-
-            la $a0, ascii_num_buffer
-            jal RESET_STRING
-    j main_loop_TEST_MAIN
-
 TEST_MAIN_2:
 TEST_STRING_TO_DOUBLE:
     la $a0, input_string
@@ -2087,7 +2034,7 @@ TEST_STRING_TO_DOUBLE:
     # jal PRINT_DOUBLE
 	
 	# li $v0, 59
-    # la $a0, ascii_out_prompt
+    # la $a0, ascii_infix_prompt
     # la $a1, input_string
     # syscall
 	
@@ -2098,12 +2045,30 @@ TEST_DOUBLE_TO_STRING:
     l.d $f26, double_0
     l.d $f28, double_1
     l.d $f30, double_10
-	
+
+    la $a0, number_buffer
+    li $a1, 1
 	mov.d $f12, $f24
     jal DOUBLE_TO_STRING
 
     jal YELLOW
-    la $a0, ascii_out_prompt
+    la $a0, ascii_infix_prompt
+    jal PRINT_STRING
+    jal RESET
+
+    jal CYAN
+    la $a0, number_buffer
+    jal PRINT_STRING
+    jal RESET
+    jal new_line
+	
+    la $a0, number_buffer
+    li $a1, 1
+	mov.d $f12, $f24
+    jal DOUBLE_TO_STRING
+
+    jal YELLOW
+    la $a0, ascii_infix_prompt
     jal PRINT_STRING
     jal RESET
 
@@ -2114,3 +2079,77 @@ TEST_DOUBLE_TO_STRING:
     jal new_line
 
     j END_PROGRAM
+
+TEST_MAIN:
+    main_loop_TEST_MAIN: # Loop and ask user to input
+        ##### Init main  #####
+            # Print "Please insert your expression: "
+            jal CYAN
+            la $a0, ascii_in_prompt     # Load address of input prompt
+            jal PRINT_STRING            # Print input prompt
+            jal RESET
+
+            # Read input from user
+            la $a0, input_string        # Load address of input buffer
+            li $a1, 102                 # Set max length of input buffer (1 space for null character)
+            jal READ_STRING_FROM_USER   # Read input from user
+
+            # 'quit' check
+            la $a0, quit_string         # Load address of quit string
+            la $a1, input_string        # Load address of user input
+            jal COMPARE_STRING          # Compare 2 strings
+            beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
+
+            # Print "Infix: "
+            jal CYAN
+            la $a0, ascii_infix_prompt    # Load address of output prompt
+            jal PRINT_STRING            # Print output prompt
+            jal RESET
+
+            # Print the infix expression
+            la $a0, input_string        # Load address of input buffer
+            jal PRINT_STRING            # Print the infix expression
+            jal new_line
+
+        #####    MAIN    #####
+            la $a0, input_string        # Evaluate the infix expression
+            jal INFIX_TO_POSTFIX
+
+            # Print "Postfix: "
+            jal CYAN
+            la $a0, ascii_postfix       
+            jal PRINT_STRING
+            jal RESET
+            
+            # Print the postfix expression
+            la $a0, postfix_string
+            jal PRINT_STRING
+            jal new_line
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
+            # Evaluate the postfix expression
+            la $a0, postfix_string
+            jal EVALUATE_POSTFIX
+
+            # Print "############"
+            la $a0, ascii_section
+            jal PRINT_STRING
+
+
+        ##### Write file #####
+            # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
+            la $a0, input_string        # Load address of input buffer
+            la $a1, filename            # Load address of the filename
+            li $a2, 9                   # Mode 9: write only with create and append
+            jal WRITE_TO_FILE           # Write the input string to the file
+
+        ##### Reset main  #####
+            la $a0, postfix_string
+            jal RESET_STRING
+
+            la $a0, ascii_num_buffer
+            jal RESET_STRING
+    j main_loop_TEST_MAIN
