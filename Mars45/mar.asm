@@ -2,10 +2,7 @@
 .data
     ## Variables
         M:                  .space 8   # M
-        operand1:           .space 8   # Operand 1
-        operand2:           .space 8   # Operand 2
         temp_operand:       .space 8   # Temporary operand
-        test_num:           .word 100  # 1.0
         # 1 (top_pointer) + 1 (length) + 50 (memory space) words // TODO: Change 50
         stack:              .space 208 # Stack
         
@@ -19,7 +16,7 @@
         double_1:       .double 1.0
         double_10:      .double 10.0
         double_10p6:    .double 100000000.0
-        double_test:    .double -123450.10001
+        double_test:    .double 123450.12344
 
     ### file    
         filename:   .asciiz "calc_log.txt"
@@ -33,6 +30,7 @@
         quit_string:        .asciiz "quit"
         ascii_infix_prompt: .asciiz "Infix: "
         ascii_postfix:      .asciiz "Postfix: "
+        ascii_result:       .asciiz "Result: "
         ascii_in_prompt:    .asciiz "Please insert your expression: "
         ascii_quit_prompt:  .asciiz "You have typed 'quit'.\n"
         ascii_exit_prompt:  .asciiz "Exiting program...!\n"
@@ -68,6 +66,7 @@ main:
     jal INIT_MAIN
     j TEST_MAIN
     # j TEST_STACK_DOUBLE_METHOD
+    # j TEST_DOUBLE_TO_STRING
 j END_PROGRAM
 
 INIT_MAIN:
@@ -91,47 +90,6 @@ INIT_MAIN:
     jr $ra
 
 #### DOUBLE
-LOAD_DOUBLE: # nguyenpanda
-    # LOAD_DOUBLE(address = $a0) => $f0
-    #   - Load a double from memory address as follow IEEE 754 format
-    # Parameters:
-    #   a0: Address
-    # Return:
-    #   f0: Double
-    ##### Init function  #####
-        addi $sp, $sp, -8  # LOAD_DOUBLE: use 2 registers $ra, $a0
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-
-    ##### Main function  #####
-        l.d $f0, 0($a0)
-
-    ##### Reset function  #####
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        addi $sp, $sp, 8
-    jr $ra  # Return LOAD_DOUBLE
-
-SAVE_DOUBLE: # nguyenpanda
-    # SAVE_DOUBLE(double = $f12, address = $a0) => void
-    #   - Save a double to memory address as follow IEEE 754 format
-    # Parameters:
-    #   f12: Double
-    #   a0: Address
-    ##### Init function  #####
-        addi $sp, $sp, -8  # SAVE_DOUBLE: use 2 registers $ra, $a0
-        sw $ra, 0($sp)
-        sw $a0, 4($sp)
-
-    ##### Main function  #####
-        s.d $f12, 0($a0)
-
-    ##### Reset function  #####
-        lw $ra, 0($sp)
-        lw $a0, 4($sp)
-        addi $sp, $sp, 8
-    jr $ra  # Return SAVE_DOUBLE
-
 DOUBLE_TO_STRING: # nguyenpanda
     # DOUBLE_TO_STRING(string_buffer = $a0, += mode = $a1, double = $f12) => $v0, $v1
     #   - Convert a double to a string stored in string_buffer
@@ -376,7 +334,7 @@ STRING_TO_DOUBLE: # nguyenpanda
         lw $t2, 16($sp)
         lw $t3, 20($sp)        
         l.d $f30, double_10
-        addi $sp, $sp, -24
+        addi $sp, $sp, 24
     jr $ra  # Return STRING_TO_FLOAT
 
 ### READ INPUT
@@ -1046,51 +1004,6 @@ OPERATOR_PRECEDENCE: # nguyenpanda
             addi $sp, $sp, 12
     jr $ra  # Return OPERATOR_PRECEDENCE
 
-OPERATE: # nguyenpanda
-    # OPERATE(operator: char = $a0, operand_0: int = $a1, operand_1: int = $a2) => $v0: int
-    #   - Perform an operation
-    # Parameters:
-    #   a0: Operator
-    #   a1: Operand 0
-    #   a2: Operand 1
-    # Return:
-    #   v0: Result of the operation
-    ##### Init function  #####
-        # addi $sp, $sp, -20  # OPERATE: use 5 registers $ra, $a0, $a1, $a2, $t0
-        # sw $ra, 0($sp)
-        # sw $a0, 4($sp)
-        # sw $a1, 8($sp)
-        # sw $a2, 12($sp)
-        # sw $t0, 16($sp)     # result
-        # move $t0, $a0       # SUPPORT PASS BY REFERENCE
-
-    ##### Main function  #####
-        # beq $t0, 43, __OPERATE_ADDITION # If operator is '+', return 1
-        # beq $t0, 45, __OPERATE_SUBSTRACTION # If operator is '-', return 1
-        
-        # beq $t0, 42, __OPERATE_MULTIPLICATION # If operator is '*', return 2
-        # beq $t0, 47, __OPERATE_DIVISION # If operator is '/', return 2
-
-        # beq $t0, 94, __OPERATE_EXPONENTIATION # If operator is '^', return 3
-        # beq $t0, 33, __OPERATE_FACTORIAL # If operator is '!', return 4
-
-        # j __OPERATE_RESET
-    ##### Return functions #####
-        # __OPERATE_ADDITION:
-        #     add $v0, $a1, $a2
-        #     j __OPERATE_RESET
-        
-        # __OPERATE_SUBSTRACTION:
-        #     sub $v0, $a1, $a2
-        #     j __OPERATE_RESET
-
-        # __OPERATE_MULTIPLICATION:
-        #     mul $v0, $a1, $a2
-        #     j __OPERATE_RESET
-
-        # __OPERATE_DIVISION:
-        #     div $v0, $a1, $a2
-
 INFIX_TO_POSTFIX: # nguyenpanda
     # INFIX_TO_POSTFIX($a0 = string) -> $v0 = string
     #   - Convert an infix expression to a postfix expression
@@ -1637,6 +1550,8 @@ EVALUATE_POSTFIX: # nguyenpanda
         la $a0, stack
         jal STACK_POP_DOUBLE
 
+        s.d $f0, M # M = result
+
         la $a0, stack
         jal STACK_RESET
 
@@ -1649,14 +1564,6 @@ EVALUATE_POSTFIX: # nguyenpanda
         lw $t3, 12($sp)
         lw $t4, 16($sp)
         addi $sp, $sp, 20
-
-        jal MAGENTA
-        mov.d $f12, $f0
-        jal PRINT_DOUBLE
-        jal RESET
-        jal new_line
-
-        j END_PROGRAM
     jr $ra  # Return EVALUATE_INFIX
 
 ### MATH
@@ -2169,16 +2076,6 @@ TEST_STACK_PUSH: # nguyenpanda
     jal PRINT_STACK
     j END_PROGRAM
 
-TEST_LOAD_SACE_DOUBLE_IEEE:
-    la $a0, operand1
-    mov.d $f12, $f24
-    jal SAVE_DOUBLE
-    
-    la $a0, operand1
-    jal LOAD_DOUBLE
-    mov.d $f16, $f0
-    j END_PROGRAM
-
 TEST_STACK_DOUBLE_METHOD:
     la $a0, stack
     mov.d $f12, $f24
@@ -2313,8 +2210,8 @@ TEST_DOUBLE_TO_STRING:
 
     j END_PROGRAM
 
-TEST_MAIN:
-    main_loop_TEST_MAIN: # Loop and ask user to input
+TEST_MAIN____:
+    main_loop_TEST_MAIN____: # Loop and ask user to input
         ##### Init main  #####
             # Print "Please insert your expression: "
             jal CYAN
@@ -2383,5 +2280,97 @@ TEST_MAIN:
             jal RESET_STRING
 
             la $a0, ascii_num_buffer
+            jal RESET_STRING
+    j main_loop_TEST_MAIN____
+
+TEST_MAIN:
+    main_loop_TEST_MAIN: # Loop and ask user to input
+        ##### Init main  #####
+            # Print "Please insert your expression: "
+            jal CYAN
+            la $a0, ascii_in_prompt     # Load address of input prompt
+            jal PRINT_STRING            # Print input prompt
+            jal RESET
+
+            # Read input from user
+            la $a0, input_string        # Load address of input buffer
+            li $a1, 102                 # Set max length of input buffer (1 space for null character)
+            jal READ_STRING_FROM_USER   # Read input from user
+
+            # 'quit' check
+            la $a0, quit_string         # Load address of quit string
+            la $a1, input_string        # Load address of user input
+            jal COMPARE_STRING          # Compare 2 strings
+            beq $v0, 1, TYPE_QUIT       # If 2 strings are the same, jump to TYPE_QUIT
+
+            # Print "Infix: "
+            jal CYAN
+            la $a0, ascii_infix_prompt  # Load address of output prompt
+            jal PRINT_STRING            # Print output prompt
+            jal RESET
+
+            # Print the infix expression
+            la $a0, input_string        # Load address of input buffer
+            jal PRINT_STRING            # Print the infix expression
+
+        #####    MAIN    #####
+            la $a0, input_string        # Evaluate the infix expression
+            jal INFIX_TO_POSTFIX
+            # Print "Postfix: "
+                jal CYAN
+                la $a0, ascii_postfix       
+                jal PRINT_STRING
+                jal RESET
+            
+                # Print the postfix expression
+                la $a0, postfix_string
+                jal PRINT_STRING
+                jal new_line
+
+            # Print "############"
+                la $a0, ascii_section
+                jal PRINT_STRING
+            
+            # Evaluate the postfix expression
+            la $a0, postfix_string
+            jal EVALUATE_POSTFIX # BREAKPOINT
+            # Print "Result: "
+                jal CYAN
+                la $a0, ascii_result
+                jal PRINT_STRING
+                jal RESET
+
+                # Print the result
+                mov.d $f12, $f0
+                jal PRINT_DOUBLE
+                jal new_line
+            
+            # Print "############"
+                la $a0, ascii_section
+                jal PRINT_STRING
+
+        ##### Write file #####
+            # Write input to file (need 3 arguments: $a0=message, $a1=filename, $a2=mode)
+            la $a0, postfix_string      # string buffer
+            li $a1, 0                   # Mode 0: replace string
+            mov.d $f12, $f0
+            jal DOUBLE_TO_STRING
+
+            la $a0, postfix_string
+            jal STRING_LENGHT
+            add $a0, $v0, $a0 # BREAKPOINT
+            li $v0, '\n'
+            sb $v0, 0($a0)
+
+            la $a0, postfix_string
+            la $a1, filename            # Load address of the filename
+            li $a2, 9                   # Mode 9: write only with create and append
+            jal WRITE_TO_FILE           # Write the postfix string to the file
+
+        ##### Reset main  #####
+            la $a0, postfix_string
+            jal RESET_STRING
+
+            la $a0, number_buffer
             jal RESET_STRING
     j main_loop_TEST_MAIN
