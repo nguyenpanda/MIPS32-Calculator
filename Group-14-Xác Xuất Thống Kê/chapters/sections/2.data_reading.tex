@@ -1,0 +1,14 @@
+\section{Data preprocessing}
+\subsection{Data reading}
+In the course of this process, several key R packages in \hyperlink{Listing 1}{\textit{\textcolor{blue}{Listing 1}}} have been instrumental:
+\begin{itemize}
+\item \verb|rio|: plays a pivotal role in streamlining input and output operations for datasets, enhancing ease and safety in data import and export. Notably, it accommodates multiple file formats, eliminating the need for constant command adjustments with changing file formats.
+\item\verb|ggplot2|: for effective data visualization, recognized for its flexibility and capability to generate visually appealing plots.
+\item\verb|zoo|: dedicated to handling non-standard date format, especially the "Launch date", by transform them into a standardized year-quarter format.
+\item\verb|car|: Provides functions like levene and shapiro for testing assumptions in statistical analysis.
+\item\verb|FSA|: proves valuable for post hoc tests, enabling a deeper exploration of group differences following significant statistical results.
+\end{itemize}
+
+\subsection{Data cleaning}
+Having identified the relevant attributes, we have successfully created a subset from the original raw dataset. However, the dataset exhibits variability in data types, ranging from strings and non-standard year-quarter formats to numeric-strings. To facilitate a more seamless, uniform, and accurate analysis, there is a need to transform these values into consistent types.\\ 
+ It's important to note that the cleaning process at this stage doesn't automatically remove missing values (\mintinline{R}{NA}) unless it becomes imperative. This approach is intentional, as certain instances may contain crucial information, and a blanket removal of \mintinline{R}{NA} values might lead to the loss of significant data. It's recognized that under different analytical scopes, instances with \mintinline{R}{NA} values shouldn't be universally deemed as invalid data. In subsequent sections, as the focus narrows down to specific data patterns, a targeted \mintinline{R}{NA} cleaning process will be applied. This ensures that no important instances are inadvertently lost during the broader cleaning phase. 

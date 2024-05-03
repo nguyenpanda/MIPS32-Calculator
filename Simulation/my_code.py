@@ -219,6 +219,8 @@ def test_csv(filename, output):
 if __name__ == '__main__':
     # test_csv('data.csv', 'test_case.csv')
     test_csv('temp.csv', 'test_case.csv')
+    # infixToPostfix(input('Enter: '), 10)
+    
 
     # M = 10
     # while True:

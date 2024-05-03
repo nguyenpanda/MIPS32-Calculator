@@ -1,0 +1,247 @@
+%
+%   BACKGROUND
+%
+%   Introduce external and additional knowledge (the methods we did not learn)
+%   Le Hieu did present some weird stuff in this section (also called Theory Basis)
+\clearpage
+\section{Background}
+\subsection{Regression Model}
+\subsubsection{Linear Regression Model}
+
+\noindent 
+
+\textbf{Multiple linear regression (MLR)}, also known simply as multiple regression, is a statistical technique that uses several explanatory variables to predict the outcome of a response variable. The goal of multiple linear regression is to model the linear relationship between the explanatory (independent) variables and response (dependent) variables. The formula of multiple linear regression:
+$$
+{y}_{i}={\beta}_{0}+{\beta}_{1} {x}_{i1}+{\beta}_{2} {x}_{i2}+...+{\beta}_{p} {x}_{ip}+\epsilon
+$$
+\textit{where:}
+\begin{itemize}
+    \item ${y}_{i}$ is the dependent variable.
+    \item ${x}_{ip}$ is the explanatory variables.
+    \item ${\beta}_{0}$ is the y-intercept (constant term).
+    \item ${\beta}_{p}$ is the slope coefficients for each explanatory variable.
+    \item $\epsilon$ is the model's error term (also known as the residuals).
+\end{itemize}
+
+When using linear regression, there are several assumptions that are typically made.
+
+\textbf{Assumption 1: Linearity}, the relationship between the dependent variable and the independent variable is linear.
+
+\textbf{Assumption 2: Independence}, the observations are independent of each other
+$$
+Cov({\varepsilon}_{i},{\varepsilon}_{j})=0,i\neq j
+$$
+\textit{where} $Cov({\varepsilon}_{i},{\varepsilon}_{j})$ is the covariance between the errors for observations $i$ and $j$.
+
+\textbf{Assumption 3: Homoscedasticity}, the variance of the errors is constant across all levels of the independent variable(s)
+$$
+Var({\varepsilon}_{i})=\sigma ^{2},\forall i
+$$
+\textit{where} $Var({\varepsilon}_{i})$ is the variance of the error for observations $i$ and $\sigma ^{2}$ is a constant.
+
+\textbf{Assumption 4: Normality}, the errors are normally distributed
+$$
+\varepsilon ~ \sim N(0,\sigma ^{2})
+$$
+\textit{where} $\varepsilon$ is the error term and $N(0,\sigma ^{2})$ denotes a normal distribution with mean 0 and variance $\sigma ^{2}$.
+\subsubsection{Random Forest regression}
+\textbf{Random Forest regression} is a supervised learning algorithm that uses ensemble learning method for regression. Ensemble learning method is a technique that combines predictions from multiple machine learning algorithms to make a more accurate prediction than a single model.
+
+Random forest is an ensemble of decision trees. This is to say that many trees, constructed in a certain “random” way form a Random Forest, whether:
+\begin{itemize}
+    \item Each tree is created from a different sample of rows and at each node, a different sample of features is selected for splitting.
+    \item Each of the trees makes its own individual prediction.
+    \item These predictions are then averaged to produce a single result.
+    \item The averaging makes a Random Forest better than a single Decision Tree hence improves its accuracy and reduces overfitting. A prediction from the Random Forest Regressor is an average of the predictions produced by the trees in the forest.
+\end{itemize}
+
+When using random forest regression, there are several assumptions that are typically made.
+
+\textbf{Assumption 1: Independence of observations},  this assumption states that the observations in the dataset used for building the Random Forest regression model should be independent.
+
+\textbf{Assumption 2: Input feature representation}, this assumption emphasizes the importance of appropriate representation of input features (independent variables).
+
+\textbf{Assumption 3: Decision tree assumptions}, Random Forest regression is an ensemble of decision trees, and the assumptions of individual decision trees within the Random Forest ensemble apply.
+
+\textbf{Assumption 4: Appropriate hyperparameter tuning}, Random Forest regression has several hyperparameters, such as the number of trees, the maximum depth of trees, the minimum number of samples required to split a node, among others. However, there is no specific mathematical formula for hyperparameter tuning, as it depends on the specific dataset and problem.
+
+\subsection{Statistics measurements}
+\subsubsection{The Q-Q plot}
+\noindent 
+
+\textbf{The Q-Q plot}, or quantile-quantile plot, is a graphical tool to help us assess if a set of data plausibly came from some theoretical distribution such as a Normal or exponential. For example, if we run a statistical analysis that assumes our residuals are normally distributed, we can use a Normal Q-Q plot to check that assumption. It’s just a visual check, not an air-tight proof, so it is somewhat subjective. But it allows us to see at-a-glance if our assumption is plausible, and if not, how the assumption is violated and what data points contribute to the violation.
+
+A Q-Q plot is a scatterplot created by plotting two sets of quantiles against one another. If both sets of quantiles came from the same distribution, we should see the points forming a line that’s roughly straight.
+\subsubsection{R-Squared $(R^{2})$}
+\noindent 
+
+$R^2$ is a statistical measure that represents the proportion of the variance for a dependent variable that’s explained by an independent variable in a regression model.
+
+Whereas correlation explains the strength of the relationship between an independent and a dependent variable, R-squared explains the extent to which the variance of one variable explains the variance of the second variable. So, if the $R^{2}$ of a model is 0.50, then approximately half of the observed variation can be explained by the model’s inputs.
+
+The formula for R-squared:
+$$
+{R}^{2} = 1 - \frac{\textup{Unexplained Variation}}{\textup{Total Variation}}
+$$
+
+The calculation of R-squared requires several steps. This includes taking the data points (observations) of dependent and independent variables and finding the line of best fit, often from a regression model. From there, you would calculate predicted values, subtract actual values, and square the results. This yields a list of errors squared, which is then summed and equals the unexplained variance.
+
+The \textbf{adjusted coefficient of determination} is the multiple coefficient of determination $R^2$ modified to account for the number of variables and the sample size. It is calculated by
+$$
+\textup{Adjusted}\enskip R^2=1-\dfrac{n-1}{n-(k+1)}\times(1-R^2)
+$$
+\subsubsection{P-Value}
+\noindent 
+
+In statistics, the p-value is a measure of the evidence against a null hypothesis. It is the probability of observing a test statistic as extreme as, or more extreme than, the one calculated from the data, assuming that the null hypothesis is true.
+
+In other words, the p-value is the probability of obtaining the observed results or more extreme results, assuming that the null hypothesis is true. If the p-value is low (usually less than 0.05), it suggests that the observed results are unlikely to be due to chance and provides evidence against the null hypothesis. Conversely, if the p-value is high, it suggests that the observed results are likely to be due to chance, and there is insufficient evidence to reject the null hypothesis.
+
+The p-value is an important concept in hypothesis testing, which is a common statistical method used to make decisions based on data. It helps researchers determine whether the observed data supports or contradicts a particular hypothesis.
+\subsection{Analysis of Variance ANOVA}
+
+Analysis of variance (ANOVA) is a statistical method used to test for differences among two or more population means by analyzing the variances of samples taken from the populations.
+
+One-way ANOVA is a statistical method to compare the variances of multiple levels of a single factor.
+
+For each observation under the treatment $i$ under the $j$ observation called $y_{ij}$ we have the linear combination:
+
+\[y_{ij} = \mu + \tau_i + \epsilon_{ij} 
+\begin{cases}
+    i = 1,2,...,a.\\
+    j = 1,2,...,n.
+\end{cases}
+\]
+\textit{where,}
+\begin{itemize}
+    \item $\mu$ is the overall mean.
+    \item $\tau_i$ is the effect of the $i$th treatment effect.
+    \item $\epsilon_{ij}$ is a random component error.
+\end{itemize}
+
+We could rewritten the model as.
+
+\[y_{ij} = \mu_i + \epsilon_{ij} 
+\begin{cases}
+    i = 1,2,...,a.\\
+    j = 1,2,...,n.
+\end{cases}
+\]
+\textit{where,}
+\begin{itemize}
+    \item $\mu_i$ =  $\mu + \tau_i$
+    \item $\tau_i$ is the effect of the $i$th treatment effect.
+    \item $\epsilon_{ij}$ is a random component error.
+\end{itemize}
+
+To perform ANOVA, the following assumption is made: $\epsilon_{ij}$ is normally and independently 
+distributed : $\epsilon_{ij} \approx N(0, \sigma^2)$, and each treatment is a sample that follows $N(0, \sigma^2)$.
+
+
+\begin{enumerate}
+    \item Normality: The populations have distributions that are approximately normal.
+    \item Homoscedasticity  : The populations have the same variance
+    \item Independent: the data is random and independent.
+\end{enumerate}
+
+However the Normality and Homogeneity of variance are only loose requirement as the method still well despite failing these assumption\cite{mont03}
+However we will also use the Kruskal - Wallis test for anything that do not sastify the assumption.
+We want to test the Null hypothesis:
+\[
+\begin{cases}
+    H_0: \mu_1 = \mu_2 = ... = \mu_n \\
+    H_1: \text{two mean are different}
+\end{cases}
+\]
+
+Total sum of squares:
+\[ SS_T = \sum_{i = 1}^{a} \sum_{j = 1}^{n} (y_{ij} - \bar{y})^2\]
+\[ SS_T = n\sum_{i=1}^{a}(\bar{y_i}-\bar{y})^2 + \sum_{i=1}^{a}\sum_{j=1}^{n}(y_{ij}-\bar{y_i})^2\]
+
+or
+\[ SS_T = SS_{Treatment}+SS_{Error}\]
+
+where degree of freedom is:
+\[df(SS_T) = N - 1 \quad df(SS_{Treatment}) = a - 1 \quad df(SS_{Error}) = N - a \]
+
+Mean square for treatments: 
+\[MS_{Treatment} = SS_{Treatment} / df(SS_{Treatment})\]
+\[MS_{Treatment} = SS_{Treatment} / (a - 1)\]
+
+Mean square for error: 
+\[MS_{Error} = SS_{Treatment} / df(SS_{Error})\]
+\[MS_{Error} = SS_{Treatment} / (N - a)\]   
+
+F test statistic: 
+\[F_0 = \frac{MS_{Treatment}}{MS_{Error}}\]
+
+If \[F_0 > F_{\alpha , a-1,a(n-1)}\]
+
+
+\subsection{Levene test}
+Levene's test is used to test if k samples have equal variance. In this assignment, we will use it as the primary tool for testing the Homogeneity of variance.
+
+Given a variable Y with sample of size N divided into k subgroups where $N_i$ is the sample size of the $i$th subgroup, the Levene test is defined as:
+\[
+\begin{cases}
+    H_0: \sigma_1^2 = \sigma_2^2 =...=\sigma_k^2 \\ 
+    H_1: \text{there are at least one pair with unequal variance.}
+\end{cases}
+\]
+\[W = \frac{(N-K)}{(k-1)}\frac{\sum_{i=1}^{k}N_i(\bar{Z_i}-\bar{Z})^2}{\sum_{i=1}^{j}\sum_{j=1}^{N_i}(Z_{ij}-\bar{Z_i})^2}\]
+\textit{where} $Z_{ij}$ can have one of these following definitions:
+
+\begin{itemize}
+    \item $Z_{ij} = Y_{iJ} - \bar{Y_i}$ where $\bar{Y_i}$ is the mean  of the $i$th subgroup.
+    \item $Z_{ij} = Y_{iJ} - \tilde{Y_i}$ where $\tilde{Y_i}$ is the median of the $i$th subgroup.
+    \item $Z_{ij} = Y_{iJ} - \bar{Y_i}^{'}$ where $\bar{Y_i}^{'}$ is the trimmed mean of the $i$th subgroup.
+\end{itemize}
+
+The three choice for detemining $Z_{ij}$ determine the robustness and power of Levene's test. We will choose choice where $\tilde{Y_i}$ is the median as it is the default choice of LeveneTest in R
+
+\subsection{Shapiro-Wilk test}
+The Shapiro-Wilk test, calculates a W statistic that tests whether a random sample, $x_1$, $x_2$, ..., $x_n$ come from a normal distribution. 
+The W statistic is calculated as:
+\[W = \frac{(\sum_{i=1}^{n}a_ix_{(i)})^2}{\sum_{i=1}^{n}(x_i-\bar{x})^2}\]
+\textit{where:}
+\begin{itemize}
+    \item $x_{(i)}$ are the ordered sample values
+    \item $a_i$ are the constant generated from the means, variance and covariance of the order of a sample of size n from a normal distribution.
+    \item $\bar{x}$ is the sample mean
+\end{itemize}
+
+We would like to use this test to test the Null hypothesis:
+\[
+\begin{cases}
+    H_0: \text{the population is normally distributed} \\
+    H_1: \text{the population is not normally distributed}
+\end{cases}
+\]
+if the p-value is less than $\alpha$ then we can reject the null hypothesis this test and consider our data to not be Normally distributed.
+
+\subsection{Post-hoc comparison tests\cite{foster22}}
+
+
+
+\subsubsection{Tukey HSD test}
+
+Tukey HSD's test compares the means of every treatment to the means of every other treatment; 
+that is, it applies simultaneously to the set of all pairwise comparisons
+
+Tukey HSD test perform a pairwise comparison between the means of the treatments by seeing whether their difference
+is statistically significant as compared to the expected standard error. It makes use of studentized range statistic:
+
+\begin{equation}
+    Q = \frac{\bar{y}_{\text{max}} - \bar{y}_{\text{min}}}{SE}
+\end{equation}
+\textit{where,} $\bar{y}_{\text{max}}$ and $\bar{y}_{\text{min}}$
+are the largest and smallest sample means, respectively.
+
+This test indicates two means are different if $Q > g(\alpha,f)\times S$\cite{tukey},
+where, $S$ is the standard error of this statistic, and $g(\alpha,f)$ is studentized range 
+distribution of significant level $\alpha$ and even degree of freedom $f$.
+
+
+
+
+

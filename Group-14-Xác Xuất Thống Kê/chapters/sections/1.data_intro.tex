@@ -1,0 +1,50 @@
+\section{Data introduction}
+
+This dataset contains detailed specifications, release dates, and release prices of Intel CPUs. These specifications include some important attributes of a CPU,
+and describes the performance (through \textit{Base frequency}), power consumption and heat (through \textit{Thermal design power}), and the technology trend (through
+\textit{Number of cores} and \textit{Lithography}).
+
+CPU (Central Processing Unit) is the most fundamental of a computer. CPU basically loads the instruction and execute it clock by clock, and produces return values.
+Modern computers divides itself into many small processing units (called cores). During execution, it generates a lot of heat.
+
+The dataset is retrieved from \href{https://www.kaggle.com/datasets/iliassekkaf/computerparts?select=Intel_CPUs.csv}{Computer Parts (CPUs and GPUs) Dataset (Kaggle)} 
+by author Ilissek. Some notable attributes of this dataset are:
+
+\renewcommand{\arraystretch}{1.5}
+
+\begin{longtable}{|m{3cm}|m{3cm}|m{3cm}|m{5cm}|}
+  \hline
+    \textbf{Variable} & \textbf{Data type} & \textbf{Unit} & \textbf{Description} \\
+  \hline
+  \endfirsthead
+  \hline
+  \textbf{Variable} & \textbf{Data type} & \textbf{Unit} & \textbf{Description} \\
+  \hline
+  \endhead
+  
+  Launch date\cite{ldate} & Categorical &  & The quarter-year date of which the CPU was available on the market.\\
+  \hline
+  Lithography\cite{litho} & Categorical & Nanometer & The chip printing technique that was used to manufacture the CPU. Roughly speaking, as technology advances forward, this technique is getting smaller and smaller.\\
+  \hline
+  % Tại vì nó là khoảng giá trị, nên sẽ lấy max
+  Recommended Customer Price\cite{price} & Categorical & Dollar & The price recommended by Intel for retailers selling the CPU.\\
+  \hline
+  Number of Cores\cite{cores} & Categorical &  & Number of processing units on one CPU. More cores do not mean a better CPU. However, it helps utilize parallel computing (multiple programs running at the same time).\\
+  \hline
+  Base frequency\cite{freq} & Continuous & MHz & Expected operating clock rate of a CPU. Larger frequency means a faster clock rate and therefore better performance.\\
+  \hline
+  Temperature & Continuous & Celcius degree & The maximum temperature allowed on the CPU, before it could be damaged.\\
+  \hline
+  Thermal design power\cite{tdp}& Continuos & Watts & Theoretical heat and power consumption ceiling, the amount of heat
+needed to be cooled for normal operation of the CPU. \\
+  \hline
+  \caption{Description of Variables} \\
+\end{longtable}
+
+
+Some key factors in the dataset :
+\begin{itemize}
+    \item \verb|Population|: CPUs from Intel.
+    \item \verb|Observation|: 2283 product collections produced by Intel
+    \item \verb|Feature|: 45 variables
+\end{itemize}
