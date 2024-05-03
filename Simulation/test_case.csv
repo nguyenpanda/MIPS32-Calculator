@@ -1,2 +1,0 @@
-id,bool_value,bool_postfix,got_value,except_value,got_postfix,expected_postfix
-0,True,True,4.333333333333334,4.3333333333333333333,M 1 +,M 1 +

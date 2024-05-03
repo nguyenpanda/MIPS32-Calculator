@@ -24,25 +24,10 @@ def print_info_(char, num_buffer, stack, optional=None):
     print('\t->Num buffer:', num_buffer)
     print('\t->Stack:', stack)
 
-def add(x, y):
-    return x + y
-
-def sub(x, y):
-    return x - y
-
-def mul(x, y):
-    return x * y
-
-def div(x, y):
-    return x / y
-
 def fact(n: int) -> int:
     if n < 0:
         raise ValueError(f'Factorial of negative number is undefined, got n {n}')
     return 1 if n == 0 else n * fact(n - 1)
-
-def exp(x, y):
-    return x ** y
 
 def isOperand(char: str) -> bool:
     return char.isdigit() or char == '.' or char == 'M'
@@ -65,7 +50,6 @@ def infixToPostfix(string: str, M: int):
     result: str = ''
     
     for char in string:
-        # print_info(char, result, stack)
         if (isOperand(char)):
             result += char
         elif char == ' ':
@@ -81,16 +65,13 @@ def infixToPostfix(string: str, M: int):
         elif isOperator(char):
             if char == '!':
                 result += ' !'
-                # print(f'{char}| ', stack, '', f'|{result}|')
                 continue
             
             if (char == '-' 
                 and (not result or result[-1] in ('(', ' ', '*', '/', '^'))
                 and (not stack or stack[-1] in ('(', ' ', '*', '/', '^'))
                 ):
-                # print(f'bool: {char == '-'} - {not stack or stack[-1] in ('(', ' ', '*', '/', '^')} - {not result or result[-1] in ("(", " ", "*", "/", "^")}')
                 result += char
-                # print(f'{char}| ', stack, '', f'|{result}|')
                 continue
             
             while (stack 
@@ -103,7 +84,7 @@ def infixToPostfix(string: str, M: int):
             result += ' '
         else:
             raise Exception('Invalid character')
-        # print_info_(char, result, stack)
+
     while stack:
         result += ' '
         result += stack.pop()
@@ -111,67 +92,42 @@ def infixToPostfix(string: str, M: int):
     return result
 
 def evaluate_postfix(expression: str, M: int):
-    # t0 = postfix string
-    # t1 = string length
-    # t3 = temp
-    # t4 = char
-    stack = []
-    number = ''
+    stack: list[float] = []
+    number: str = ''
 
     for char in expression:
-        print_info(char, number, stack)
-        if char == 'M':
-            number += str(M)
-        elif isOperand(char) or (char == '-' and len(stack) < 2):
-            number += char
+        if char == 'M': number += str(M)
+        elif isOperand(char) or (char == '-' and len(stack) < 2): number += char
         elif char == ' ':
             if number:
-                print(f'\t|{char}| ', stack, '', f'|{number}|')
-                
                 if number == '-':
-                    operand2 = stack.pop()
-                    operand1 = stack.pop()
-                    stack.append(operand1 - operand2)
+                    stack.append(stack.pop() - operand2)
                     number = ''
                 else:
                     stack.append(float(number))
                     number = ''
         else:
             if number:
-                print(f'\t|{char}| ', stack, '', f'|{number}|')
                 stack.append(float(number))
                 number = ''
 
+            operand2 = stack.pop()
             if char == '+':
-                operand2 = stack.pop()
-                operand1 = stack.pop()
-                stack.append(operand1 + operand2)
+                stack.append(stack.pop() + operand2)
             elif char == '-':
-                operand2 = stack.pop()
-                operand1 = stack.pop()
-                stack.append(operand1 - operand2)
+                stack.append(stack.pop() - operand2)
             elif char == '*':
-                operand2 = stack.pop()
-                operand1 = stack.pop()
-                stack.append(operand1 * operand2)
+                stack.append(stack.pop() * operand2)
             elif char == '/':
-                operand2 = stack.pop()
-                operand1 = stack.pop()
-                stack.append(operand1 / operand2)
+                stack.append(stack.pop() / operand2)
             elif char == '!':
-                operand = stack.pop()
-                stack.append(fact(operand))
+                stack.append(fact(int(operand2)))
             elif char == '^':
-                operand2 = stack.pop()
-                operand1 = stack.pop()
-                stack.append(operand1 ** operand2)
+                stack.append(stack.pop() ** int(operand2))
             else:
                 raise ValueError("Invalid token in expression")
-        print_info_(char, number, stack)
     
     if number:
-        print(f'\t->|{char}| ', stack, '', f'|{number}|')
-        # if number != '-':
         stack.append(float(number))
 
     if len(stack) != 1:
@@ -217,31 +173,5 @@ def test_csv(filename, output):
     else: print(f'\033[1;91m{false_case} case are wrong in {case} test cases\033[0m')
 
 if __name__ == '__main__':
-    # test_csv('data.csv', 'test_case.csv')
-    test_csv('temp.csv', 'test_case.csv')
-    # infixToPostfix(input('Enter: '), 10)
+    test_csv('main_tc.csv', 'result_tc.csv')
     
-
-    # M = 10
-    # while True:
-    #     try:
-    #         __input: str = input('\033[1;93mEnter the expression: \033[0m')
-            
-    #         __input: str = infixToPostfix(__input, M)
-    #         print('\n\n\033[1;93mPostfix:\033[0m', __input)
-            
-    #         __input: str = evaluate_postfix(__input, M)
-    #         print('\033[1;93mResult:\033[0m', __input)
-    #     except Exception as e:
-    #         print(f'\033[1;91m{e}\033[0m')
-
-# t0 = input string
-# t1 = string length
-# t2 = stack
-# t3 = result string
-# t4 = char
-# t5 = temp
-
-
-
-
