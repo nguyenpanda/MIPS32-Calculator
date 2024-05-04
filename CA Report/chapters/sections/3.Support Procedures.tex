@@ -1,0 +1,206 @@
+\renewcommand{\arraystretch}{1.5}
+
+\section{Description of Support Procedures}
+
+\label{sec:3.SupportProcedures}
+
+All procedures follow the convention of using \$a0-\$a3 as arguments and \$v0-\$v1 as return registers, taken from registers with smaller to larger values. All registers used by the procedures are stored in main memory, so when encountering the \texttt{jr \$ra} instruction, all registers are restored to their values before the subprocedure calculation.
+
+For functions that need to use registers in Coprocessor 1 (\texttt{\$f<x>}), here is my convention for register management:
+
+\begin{itemize}
+    \label{sec:3.Coprocessor Management}
+    \item \verb|Return|\space\space\space\space: \$f0 - \$f3
+    \item \verb|Temporary|: \$f4 - \$f11
+    \item \verb|Argument|\space\space: \$f12 - \$f15
+    \item \verb|Temporary|: \$f16 - \$f19
+    \item \verb|Constant|\space\space: \$f24 - \$f31
+\end{itemize}
+
+All privates prefixed with double underscores are indications of private procedures, only to be used within their own procedures or when called. The coder should not actively call them out.
+
+\subsection{Description of character and string handling}
+    The procedures below aid two main procedures, \texttt{INFIX\_TO\_POSTFIX} [\ref{sec:5.INFIX_TO_POSTFIX}] and \texttt{EVALUATE\_POSTFIX} [\ref{sec:5.EVALUATE_POSTFIX}], \texttt{STACK} [\ref{sec:4.Stack}], as well as other related procedures. They include character checks and string-handling functions
+    
+    \begin{longtable}{|m{2.5cm}|m{2.5cm}|m{2.5cm}|m{1cm}|m{5.6cm}|}
+        \hline
+            \textbf{Procedure} & 
+            \textbf{Args} & 
+            \textbf{Return} & 
+            \centering \textbf{Leaf fucnt} &
+            \textbf{Description}\\
+        \hline
+        \endfirsthead
+            IS\_ OPERAND& 
+            char = \$a0&
+            bool = \$v0&
+            \centering X&
+            Checking if a character is an operand.\\
+        \hline
+            IS\_ OPERATOR& 
+            char = \$a0&
+            bool = \$v0&
+            \centering X&
+            Checking if a character is in (+, -, *, /, \^{}, !).\\
+        \hline
+            OPERATOR\_ PRECEDENCE& 
+            char = \$a0&
+            bool = \$v0&
+            \centering X&
+            Getting the precedence of an operator.\\
+        \hline
+            STRING\_ LENGTH& 
+            str = \$a0&
+            int = \$v0&
+            \centering X&
+            Getting the length of a string by looping through the string until it encounters the null or newline character. This procedure has a time complexity of \(O(n)\).\\
+        \hline
+            COMPARE\_ STRING& 
+            str = \$a0
+            \newline str = \$a1&
+            bool = \$v0&
+            &
+            Comparing two strings by looping through both strings, return true if both strings are the same length and have identical contents. This operation has a time complexity of \(O(n)\).\\
+        \hline
+            RESET\_ STRING& 
+            str = \$a0
+            \newline str = \$a0&
+            \centering void&
+            \centering X&
+            Resetting the space containing the string by looping through and replacing each character with a null character. This operation has a time complexity of \(O(n)\).\\
+        \hline
+        \caption{Description of Support Procedures} \\
+    \end{longtable}
+
+\subsection{Mathematics procedures}
+    \begin{longtable}{|m{2.5cm}|m{2.5cm}|m{2.5cm}|m{1cm}|m{5.6cm}|}
+        \hline
+            \textbf{Procedure} & 
+            \textbf{Args} & 
+            \textbf{Return} & 
+            \centering \textbf{Leaf fucnt} &
+            \textbf{Description}\\
+        \hline
+        \endfirsthead
+            FACTORIAL& 
+            int = \$a0&
+            int = \$v0&
+            &
+            Calculating the factorial of an integer using recursion. If the input is greater than 0 and less than 16, raise an exception and end the program. This operation has a time complexity of \(O(n)\).\\
+        \hline
+            EXPONENT& 
+            double = \$f12
+            \newline double = \$f14&
+            double = \$f0&
+            \centering X&
+            Calculating the exponent of \$f12 \^{} \$f14 by looping. It automatically floors \$f14 into an integer and can calculate if \$f14 < 0.  This operation has a time complexity of \(O(|int(\$f14)|)\). Notice that if \$f12 = \$f14 = 0, raise an exception\\
+        \hline
+        \caption{Description of Mathematics Procedures} \\
+    \end{longtable}
+
+\subsection{Utility procedures}
+    In this subsection, there will be utility procedures that do not contribute significantly to the algorithms of the \texttt{INFIX\_TO\_POSTFIX} [\ref{sec:5.INFIX_TO_POSTFIX}] and \texttt{EVALUATE\_POSTFIX} [\ref{sec:5.EVALUATE_POSTFIX}] procedures. They are used solely for display and assignment requirements.
+
+    \begin{longtable}{|m{3.3cm}|m{2.9cm}|m{1.3cm}|m{1.1cm}|m{5.6cm}|}
+        \hline
+            \textbf{Procedure} & 
+            \textbf{Args} & 
+            \textbf{Return} & 
+            \centering \textbf{Leaf fucnt} &
+            \textbf{Description}\\
+        \hline
+        \endfirsthead
+        \hline
+            \textbf{Procedure} & 
+            \textbf{Args} & 
+            \textbf{Return} & 
+            \centering \textbf{Leaf fucnt} &
+            \textbf{Description}\\
+        \hline
+        \endhead
+            END\_PROGRAM& 
+            \centering -&
+            void&
+            \centering X&
+            The exit prompt will be displayed, and the system call \$v0 = 10 will be invoked to end the program.\\
+        \hline
+            TYPE\_QUIT& 
+            \centering -&
+            void&
+            \centering -&
+            The quit prompt will be displayed, and the \texttt{END\_PROGRAM} procedure will be called.\\
+        \hline
+            WRITE\_ TO\_FILE& 
+            message = \$a0 \newline filename = \$a1 \newline mode = \$a2&
+            void&
+            \centering -&
+            This procedure is used to \emph{write} only with create (\$a2=1) or \emph{append} (\$a2=9) strings to a file. It automatically measures the length of the string to write to the file by calling the \texttt{STRING\_LENGTH} procedure and closes the file after writing to it.\\
+        \hline
+            new\_line& 
+            \centering -&
+            void&
+            \centering X&
+            When printing newline characters to the screen, note that this function will be convenient for code writers but will significantly slow down the program due to unnecessary procedures.\\
+        \hline
+        \caption{Description of Utility Procedures} \\
+    \end{longtable}
+
+    \newpage
+    
+    \subsubsection{Print Procedures}
+        \label{sec:3.Print}
+        The procedures below are considered leaf procedures supporting screen printing by calling \texttt{syscall}.
+        
+        \begin{multicols}{2}
+            \begin{itemize}
+                \label{sec:3.Print function}
+                \item \verb|PRINT_DOUBLE|: double = \$f12
+                \item \verb|PRINT_STRING|: string = \$a0
+                \item \verb|PRINT_CHAR|\space\space\space: char = \$a0
+                \item \verb|PRINT_INT|\space\space\space\space: int = \$a0
+            \end{itemize}
+        \end{multicols}
+
+        Example:
+        \begin{code}{ASM}
+            # Integer
+            li $a0, 2024
+            jal PRINT_INT
+
+            # Character
+            li $a0, 97
+            jal PRINT_CHAR
+
+            # Double (The index of Coprocessor must be even)
+            mov.d $f12, $f8 # Assume $f8 = 09052024.1259
+            jal PRINT_DOUBLE
+        \end{code}
+        \begin{lstlisting}[language=ASM, caption=Color procedures]
+        \end{lstlisting}
+    
+    \subsubsection{Color Procedures}
+        \label{sec:3.Color}
+        All procedures below are leaf procedures, simply using the \texttt{jal <COLOR LABEL>} command before and after a print command will suffice.
+    
+        \begin{multicols}{4}
+            \begin{itemize}
+                \item \verb|RED|
+                \item \verb|GREEN|
+                \item \verb|YELLOW|
+                \item \verb|BLUE|
+                \item \verb|MAGENTA|
+                \item \verb|CYAN|
+                \item \verb|RESET|
+            \end{itemize}
+        \end{multicols}
+    
+        Example:
+        \begin{code}{ASM}
+            jal CYAN
+            la $a0, ascii_string # ascii_string: .asciiz "I'm studying CA at BKU\n"
+            jal PRINT_STRING
+            jal RESET
+        \end{code}
+        \begin{lstlisting}[language=ASM, caption=Color procedures]
+        \end{lstlisting}
+                

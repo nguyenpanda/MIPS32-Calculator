@@ -1,0 +1,72 @@
+\documentclass[11pt]{hcmut-report}
+\usepackage{codespace}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{minted} % for minted code
+% Encodings
+\usepackage{gensymb, textcomp}
+% Better tables
+% Wide tables go to https://tex.stackexchange.com/q/332902
+\usepackage{array, multicol, multirow, siunitx, tabularx}
+\usepackage{blindtext}
+% Better enum
+\usepackage{enumitem}
+% Graphics
+\usepackage{caption, float}
+\usepackage{subcaption}
+
+\DeclareCaptionFormat{custom} {
+    \textbf{#1#2}\textit{\small #3}
+}
+\captionsetup{format=custom}
+
+\usepackage[export]{adjustbox}
+
+% For demonstration purposes, remove in production
+\usepackage{mwe}
+
+% % Configurations
+\newcounter{memberrowno}
+\setcounter{memberrowno}{0}
+\reportlayout%
+
+% Override (some) default values
+\ocoursename{COMPUTER ARCHITECTURE (CO2007)}
+\oreporttype{Computer Architecture Assignment - Semester 232}
+\title{CALCULATOR}
+\oadvisor{MSc. Nguyễn Thiên Ân}
+
+% Custom commands
+\newcommand*\mean[1]{\bar{#1}}
+
+\begin{document}
+    \coverpage%
+    
+    \newpage
+        \tableofcontents
+    \newpage
+        \listoffigures
+        \listoftables
+    \newpage
+    
+    \nocite{*}
+    
+    \include{chapters/sections/0.Abstract}
+    \include{chapters/sections/1.GUI}
+    \include{chapters/sections/2.Python code}
+    \include{chapters/sections/3.Support Procedures}
+    \include{chapters/sections/4.Stack}
+    \include{chapters/sections/5.Limitation}
+    
+    \bibliographystyle{plainnat}
+    \bibliography{refs.bib}
+    \addbibresource{refs.bib}
+    \nocite{*}
+\end{document}
