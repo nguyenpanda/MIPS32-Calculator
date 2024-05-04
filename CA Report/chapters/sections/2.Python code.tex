@@ -1,0 +1,149 @@
+\section{Algorithm and Pseudo-code}
+
+\label{2.Algorithm and PseudoCode}
+
+I utilized Python code as a `\textit{pseudo-code}` for both MIPS32 Assembly and to validate algorithms. The following code section will be divided into three parts.
+
+\subsection{Support Functions}
+    The support functions below serve essential roles in facilitating the functionality of the main calculator algorithm.
+    
+    \begin{itemize}
+        \item \textbf{fact(n: int) $\rightarrow$ int}: Calculating the factorial of \(n\). If \(n < 0\) or \(n > 16\), the function will raise an exception.
+        
+        \item \textbf{isOperand(char: str) $\rightarrow$ bool}: Checks if a character is an operand (numeric digit '0--9', decimal point '.', or memory indicator 'M').
+        
+        \item \textbf{isOperator(char: str) $\rightarrow$ bool}: Checks if a character is an operator (\(+\), \(-\), \(*\), \(/\), \(\hat{}\), \(!\)).
+        
+        \item \textbf{precedence(char: str) $\rightarrow$ int}: Determines the precedence of an operator.
+    \end{itemize}
+    
+    These functions collectively contribute to properly parsing and evaluating mathematical expressions within the calculator program. The \texttt{fact} function computes factorials, ensuring the input is within acceptable bounds to prevent overflow. \texttt{isOperand} and \texttt{isOperator} ascertain whether a given character is an operand or an operator, respectively. Finally, \texttt{precedence} determines the precedence level of operators, aiding in correct expression evaluation.
+        
+    \begin{code}{Python}
+        def fact(n: int) -> int:
+            if n < 0:
+                raise ValueError(f'Factorial of negative number, got n {n}')
+            if n > 15:
+                raise ValueError(f'Factorial of {n} is overflow in 32-bits')
+            return 1 if n == 0 else n * fact(n - 1)
+        
+        def isOperand(char: str) -> bool:
+            return char.isdigit() or char == '.' or char == 'M'
+        
+        def isOperator(char: str) -> bool:
+            return char in ('+', '-', '*', '/', '^', '!')
+        
+        def precedence(char: str) -> int:
+            if char == '+' or char == '-': return 1
+            if char == '*' or char == '/': return 2
+            if char == '^': return 3
+            if char == '!': return 4
+            return -1
+    \end{code}
+    \begin{lstlisting}[language=Python, caption=Support function in Python]
+    \end{lstlisting}
+
+\subsection{Converting Infix to Postfix Algorithm}
+\label{sec:5.INFIX_TO_POSTFIX}
+    The following Python code implements an algorithm to convert infix expressions to postfix notation   
+    This algorithm scans the input expression character by character and applies specific rules to convert it to postfix notation. It handles operands, operators, and parentheses, and ensures the correct order of operations. Additionally, it accounts for negative numbers, unary minus, unary plus, and invalid characters, raising appropriate exceptions when encountered.
+    
+    \begin{code}{Python}
+        def infixToPostfix(string: str, M: int):
+            if len(string) == 0 or len(string) > 100:
+                raise ValueError('Expression length must in range [0, 100], got length', len(string))
+            
+            stack: list[str] = []
+            result: str = ''
+            
+            for char in string:
+                if (isOperand(char)): result += char
+                elif char == ' ': continue
+                elif char == '(': stack.append(char)
+                elif char == ')':
+                    while stack and stack[-1] != '(': result += f' {stack.pop()}'
+                    if stack and stack[-1] == '(': stack.pop()
+                elif isOperator(char):
+                    if char == '!':
+                        result += ' !'
+                        continue
+                    
+                    if (char == '-' 
+                        and (not result or result[-1] in ('(', ' ', '*', '/', '^'))
+                        and (not stack or stack[-1] in ('(', ' ', '*', '/', '^'))
+                        ):
+                        result += char
+                        continue
+                    
+                    while (stack 
+                           and stack[-1] != '(' 
+                           and precedence(stack[-1]) >= precedence(char)):
+                        result += f' {stack.pop()}'
+                        
+                    stack.append(char)
+                    result += ' '
+                else:
+                    raise Exception('Invalid character')
+        
+            while stack: result += f' {stack.pop()}'
+                
+            return result
+    \end{code}
+    \begin{lstlisting}[language=Python, caption=Converting infix to postfix expression]
+    \end{lstlisting}
+
+\subsection{Evaluating Postfix Algorithm}
+\label{sec:5.EVALUATE_POSTFIX}
+    The following Python code implements an algorithm to evaluate postfix expressions.
+    This algorithm iterates through the postfix expression, performing arithmetic operations and utilizing a stack to store intermediate results. It supports operands, operators, and memory variable 'M'. Additionally, it handles negative numbers and ensures proper expression evaluation. If the expression is invalid or cannot be evaluated, appropriate exceptions are raised.
+
+    \begin{code}{Python}
+        def evaluate_postfix(expression: str, M: int):
+            stack: list[float] = []
+            number: str = ''
+        
+            for char in expression:
+                if char == 'M': 
+                    number += str(M)
+                elif isOperand(char) or (char == '-' and len(stack) < 2):
+                    number += char
+                elif char == ' ':
+                    if number:
+                        if number == '-':
+                            stack.append(stack.pop() - operand2)
+                            number = ''
+                        else:
+                            stack.append(float(number))
+                            number = ''
+                else:
+                    if number:
+                        stack.append(float(number))
+                        number = ''
+        
+                    operand2 = stack.pop()
+                    if char == '+':
+                        stack.append(stack.pop() + operand2)
+                    elif char == '-':
+                        stack.append(stack.pop() - operand2)
+                    elif char == '*':
+                        stack.append(stack.pop() * operand2)
+                    elif char == '/':
+                        stack.append(stack.pop() / operand2)
+                    elif char == '!':
+                        stack.append(fact(int(operand2)))
+                    elif char == '^':
+                        operand2 = stack.pop()
+                        stack.append(stack.pop() ** int(operand2))
+                    else:
+                        raise ValueError("Invalid token in expression")
+            
+            if number:
+                stack.append(float(number))
+        
+            if len(stack) != 1:
+                raise ValueError('Invalid postfix expression')
+            
+            return stack.pop()
+    \end{code}
+    \begin{lstlisting}[language=Python, caption=Evaluate Postfix]
+    \end{lstlisting}

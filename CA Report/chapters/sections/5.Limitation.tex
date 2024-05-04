@@ -1,0 +1,55 @@
+\section{Limitations}
+    In this section, I will outline areas where the program can be further improved in the future. These areas are listed from \textbf{\textit{major issues to minor ones}}.
+    
+    \subsection{Handling Unary Operations}
+        My program still has numerous bugs, especially in handling unary operations such as addition and minus. I've tested several cases like multiple consecutive addition or subtraction signs before a number, or a minus sign before a parenthesis, and the program crashes. This occurs due to flaws in my Python algorithm. The following code is the result of both MIPS32 and Python.
+
+        \label{sec:5.Limitations}
+        \begin{code}{bash}
+            >>> Please insert your expression: -1*-(3+1)
+            >>> Result: 2
+            >>>
+            >>> Please insert your expression: (-1)*(-1)-1*-1
+            >>> Error: Invalid postfix expression
+            >>> Result: -0
+            >>> 
+            >>> Please insert your expression: -1--2
+            >>> Error: Invalid postfix expression
+            >>> Result: -2
+            >>> 
+            >>> Please insert your expression: -1+-2
+            >>> PROGRAM IS CRACKING
+            >>> 
+            >>> Please insert your expression: 1++++++2
+            >>> PROGRAM IS CRACKING
+            >>> 
+            >>> Please insert your expression: -1*(3+1
+            >>> PROGRAM IS CRACKING
+        \end{code}
+        \begin{lstlisting}[language=bash, caption={Failing testcase}]
+        \end{lstlisting}
+    
+    \subsection{Error Handling}
+        I haven't implemented error handling yet. The program usually freezes [\ref{sec:5.Limitations}] instead of automatically resetting and restarting the program from the beginning when an error occurs.
+    
+    \subsection{Arithmetic Overflow Causing File Output Error}
+        Although the program still produces approximately correct results when computing with large numbers, when exporting the result to a file, it outputs strange characters. This is because there are still many issues with my \texttt{DOUBLE\_TO\_STRING} procedure. An example for this issue:
+
+        \begin{code}{bash}
+            >>> Please insert your expression: 10^100
+            >>> Result: 1.0000000000000006e+100
+            In calc_log.txt: 
+                -./,),(-*,(../,),(-*,(./,),(-*,(
+        \end{code}
+        \begin{lstlisting}[language=bash, caption={Wrong result in \textit{.txt} file}]
+        \end{lstlisting}
+
+    \subsection{String Class Design}
+        I haven't designed a "class" for strings like I did for the "stack" because I had already written string processing functions. Consequently, these procedures all have a complexity of \(O(n)\).
+    
+    \subsection{Usage of Load and Store Commands}
+        When coding subprocedures, I always use the \texttt{sw} and \texttt{lw} commands for all \texttt{\$a<x>} and \texttt{\$t<x>} registers to make the code and debugging easier. As the theoretical class mentions, \texttt{lw} and \texttt{sw} commands consume more time than other commands. This leads to the excessive use of subprocedures for easier coding and debugging but at the cost of reducing the program's speed.
+    
+    \subsection{Heap Memory Usage}
+        I don't utilize heap memory for allocation; instead, I only use the main memory (stack) for this purpose. Consequently, my program cannot handle cases with excessively large or numerous numbers while running.
+    

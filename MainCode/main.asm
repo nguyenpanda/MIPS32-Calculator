@@ -63,10 +63,12 @@
     .globl  main
 
 main:
+    jal INIT_MAIN
+
+    # j TEST_PUSH
+
     la $a0, ascii_intro
     jal PRINT_STRING
-
-    jal INIT_MAIN
 
     main_loop_TEST_MAIN: # Loop and ask user to input
         ##### Init main  #####
@@ -124,7 +126,7 @@ main:
             jal DOUBLE_TO_STRING
 
             la $a0, postfix_string
-            jal STRING_LENGHT
+            jal STRING_LENGTH
             add $a0, $v0, $a0 # BREAKPOINT
             li $v0, '\n'
             sb $v0, 0($a0)
@@ -203,26 +205,6 @@ STACK: # nguyenpanda
             addi $sp, $sp, 4
         jr $ra  # Return STACK_INIT
 
-    __STACK_POINTER: # nguyenpanda (leaf function)(stack_pointer = $a0) => $v0 (address)
-        # STACK_LENGTH(stack_pointer $a0) => $v0 (address)
-        #  - Get the address of the top_pointer
-        # Parameters:
-        #   a0: stack_pointer
-        # Return:
-        #   v0: address of the top_pointer 
-        move $v0, $a0 # __STACK_POINTER
-        jr $ra  # Return __STACK_POINTER
-
-    __STACK_INSERT_ADDRESS: # nguyenpanda (leaf function)(stack_pointer = $a0) => $v0 (address)
-        # __STACK_INSERT_ADDRESS(stack_pointer $a0) => $v0 (address)    
-        #  - Get the address of the top, which is the next available space
-        # Parameters:
-        #   a0: stack_pointer
-        # Return:
-        #   v0: address of the top where we can insert new element
-        lw $v0, 0($a0) # __STACK_INSERT_ADDRESS
-        jr $ra  # Return __STACK_INSERT_ADDRESS
-
     STACK_LENGTH: # nguyenpanda (leaf function)(stack_pointer = $a0) => $v0 (int)
         # STACK_LENGTH(stack_pointer $a0) => $v0 (int)
         #   - Get the length of the stack
@@ -248,8 +230,7 @@ STACK: # nguyenpanda
             sw $t1, 16($sp)     # length
             sw $t2, 20($sp)     # stack_size or pointer to top
 
-            jal __STACK_POINTER
-            move $t0, $v0
+            move $t0, $a0       # __STACK_POINTER
 
             jal STACK_LENGTH
             move $t1, $v0
@@ -302,8 +283,7 @@ STACK: # nguyenpanda
             blez $t0, __STACK_UNDERFLOW   # Check for stack underflow (length <= 0)
             bgt $t0, 50, __STACK_OVERFLOW # Check for stack underflow (length > 50) // TODO: Change 50
 
-            jal __STACK_INSERT_ADDRESS
-            move $t0, $v0
+            lw $t0, 0($a0)
             addiu $t0, $t0, -4
             lw $v0, 0($t0)
 
@@ -347,8 +327,7 @@ STACK: # nguyenpanda
             sw $t1, 4($t0)
 
             # Move top_pointer to the previous element
-            jal __STACK_INSERT_ADDRESS
-            move $t2, $v0
+            lw $t2, 0($a0)
             addiu $t2, $t2, -4
             sw $zero, 0($t2)
             sw $t2, 0($t0)
@@ -365,7 +344,7 @@ STACK: # nguyenpanda
         jr $ra  # Return STACK_POP
 
     #### FOR DOUBLE
-    STACK_PUSH_DOUBLE: # nguyenpanda
+    STACK_PUSH_DOUBLE: # nguyenpanda (function)(stack_pointer = $a0, double = $f12) => void
         # STACK_PUSH_DOUBLE(stack_pointet = $a0, double = $f12) => void
         #   - Push a double to stack
         # Parameters:
@@ -394,7 +373,7 @@ STACK: # nguyenpanda
             addi $sp, $sp, 16
         jr $ra  # Return STACK_PUSH_DOUBLE
 
-    STACK_POP_DOUBLE: # nguyenpanda
+    STACK_POP_DOUBLE: # nguyenpanda (function)(stack_pointer = $a0) => $f0: double
         # STACK_POP_DOUBLE(stack_pointer = $a0) => $f0: double
         #   - Pop a double from stack
         # Parameters:
@@ -422,7 +401,7 @@ STACK: # nguyenpanda
             addi $sp, $sp, 12
         jr $ra  # Return STACK_POP_DOUBLE
 
-    STACK_LENGTH_DOUBLE: # nguyenpanda
+    STACK_LENGTH_DOUBLE: # nguyenpanda (function)(stack_pointer = $a0) => $v0: int
         # STACK_LENGTH_DOUBLE(stack_pointer = $a0) => $v0: int
         #   - Get the length of the stack
         # Parameters:
@@ -456,7 +435,7 @@ STACK: # nguyenpanda
         jr $ra  # Return STACK_LENGTH_DOUBLE
 
     #### 
-    STACK_RESET:
+    STACK_RESET: # nguyenpanda (leaf function)(stack_pointer = $a0) => void
         # STACK_RESET(stack_pointer $a0) => void
         #   - Reset the stack
         # Parameters:
@@ -471,8 +450,7 @@ STACK: # nguyenpanda
             move $t0, $a0
             addiu $t0, $t0, 8
 
-            jal __STACK_INSERT_ADDRESS
-            move $t1, $v0
+            lw $t1, 0($a0)
 
         ##### Main function  #####
             __loop_STACK_RESET:
@@ -504,7 +482,7 @@ STACK: # nguyenpanda
             addi $sp, $sp, 16
         jr $ra  # Return STACK_RESET
 
-    PRINT_STACK:
+    PRINT_STACK: # nguyenpanda (function)(stack_pointer = $a0, print_function = $a1) => void
         # PRINT_STACK(stack_pointer $a0, print_function $a1) => void
         #   - Print stack contents
         # Parameters:
@@ -519,12 +497,10 @@ STACK: # nguyenpanda
             sw $t1, 16($sp)     # top
             sw $t2, 20($sp)     # length
             
-            jal __STACK_POINTER
-            move $t0, $v0
+            move $t0, $a0       # __STACK_POINTER
             addiu $t0, $t0, 8
 
-            jal __STACK_INSERT_ADDRESS
-            move $t1, $v0
+            lw $t1, 0($a0)
 
             jal STACK_LENGTH
             move $t2, $v0
@@ -633,14 +609,14 @@ PRINT_CHAR: # nguyenpanda (leaf function)(char = $a0) => void
     #   a0: Display char
     ##### Init function  #####
         addi $sp, $sp, -4  # PRINT_CHAR: use 1 registers $a0
-        sw $a0, 4($sp)
+        sw $a0, 0($sp)
         
     ##### Main function  #####
         li $v0, 11  # PRINT_CHAR
         syscall
 
     ##### Reset function #####
-        lw $a0, 4($sp)
+        lw $a0, 0($sp)
         addi $sp, $sp, 4
     jr $ra  # Return PRINT_CHAR
 
@@ -651,14 +627,14 @@ PRINT_INT: # nguyenpanda (leaf function)(int = $a0) => void
     #   a0: Display int
     ##### Init function  #####
         addi $sp, $sp, -4  # PRINT_INT: use 1 registers $a0
-        sw $a0, 4($sp)
+        sw $a0, 0($sp)
 
     ##### Main function  #####
         li $v0, 1  # PRINT_INT
         syscall
 
     ##### Reset function #####
-        lw $a0, 4($sp)
+        lw $a0, 0($sp)
         addi $sp, $sp, 4
     jr $ra  # Return PRINT_INT
 
@@ -799,7 +775,7 @@ INFIX_TO_POSTFIX: # nguyenpanda
 
         move $t0, $a0       # SUPPORT PASS BY REFERENCE
 
-        jal STRING_LENGHT
+        jal STRING_LENGTH
         move $t1, $v0
         blt $t1, 001, __invalid_len_INFIX_TO_POSTFIX    # If length < 001, jump to exception
         bgt $t1, 100, __invalid_len_INFIX_TO_POSTFIX    # If length > 100, jump to exception
@@ -929,7 +905,7 @@ INFIX_TO_POSTFIX: # nguyenpanda
                 bne $t4, '-', __while_operator_INFIX_TO_POSTFIX
 
                 la $a0, postfix_string
-                jal STRING_LENGHT
+                jal STRING_LENGTH
                 beq $v0, 0, __next_and__operator_INFIX_TO_POSTFIX
                 
                 addi $v0, $v0, -1
@@ -1066,7 +1042,7 @@ EVALUATE_POSTFIX: # nguyenpanda
 
             # else:
                 la $a0, number_buffer
-                jal STRING_LENGHT
+                jal STRING_LENGTH
                 bne $v0, 0, __number_buffer_not_empty_postfix__EVALUATE_INFIX # BREAKPOINT
 
                 __check_operator__EVALUATE_POSTFIX:
@@ -1081,7 +1057,7 @@ EVALUATE_POSTFIX: # nguyenpanda
 
         __END_LOOP_EVALUATE_POSTFIX: 
             la $a0, number_buffer # if number: stack.append(float(number))
-            jal STRING_LENGHT
+            jal STRING_LENGTH
             beq $v0, 0, __check_stack_len_EVALUATE_POSTFIX # BREAKPOINT
 
             la $a0, number_buffer
@@ -1112,7 +1088,7 @@ EVALUATE_POSTFIX: # nguyenpanda
             bge $v0, 2, __check_space__EVALUATE_POSTFIX
             __do_operand_EVALUATE_POSTFIX:
                 la $a0, number_buffer
-                jal STRING_LENGHT
+                jal STRING_LENGTH
                 add $t3, $v0, $a0 # BREAKPOINT
                 sb $t4, 0($t3)
                 # j END_PROGRAM
@@ -1120,7 +1096,7 @@ EVALUATE_POSTFIX: # nguyenpanda
 
         __space_EVALUATE_POSTFIX:
             la $a0, number_buffer
-            jal STRING_LENGHT
+            jal STRING_LENGTH
             beq $v0, 0, __loop_EVALUATE_POSTFIX # BREAKPOINT
 
             ### Print info
@@ -1239,7 +1215,7 @@ EVALUATE_POSTFIX: # nguyenpanda
                 jal STACK_POP_DOUBLE
                 mov.d $f12, $f0 # $f18 = operand 1
 
-                jal EXPONENTIATION # $f12 = operand 1 ($f12) ^ operand 2 ($f14)
+                jal EXPONENT # $f12 = operand 1 ($f12) ^ operand 2 ($f14)
                 mov.d $f12, $f0
 
                 la $a0, stack
@@ -1294,6 +1270,7 @@ FACTORIAL: # nguyenpanda (function)(int = $a0) => $v0: int
         addi $sp, $sp, -8    # FACTORIAL: use 2 registers $t0, $ra
         sw $t0, 0($sp)
         sw $ra, 4($sp)
+        bgt $a0, 15, __exception_FACTORIAL # n > 15: jump to exception
         move $t0, $a0
         jal __FACT
         j __END_FACTORIAL
@@ -1301,7 +1278,6 @@ FACTORIAL: # nguyenpanda (function)(int = $a0) => $v0: int
     ##### Main function  #####
     __FACT:
         ##### Init function  #####
-            bgt $t0, 15, __exception_FACTORIAL # n > 15: jump to exception
             addi $sp, $sp, -8       # FACTORIAL: use 2 registers $t0, $ra
             sw $ra, 4($sp)
             sw $t0, 0($sp)          
@@ -1326,14 +1302,15 @@ FACTORIAL: # nguyenpanda (function)(int = $a0) => $v0: int
         jr $ra      # Return __FACT
 
     __exception_FACTORIAL:
+        move $t0, $a0
         jal RED         # __exception_FACTORIAL
-        # la $a0, factorial_out_of_bound
+        la $a0, exc_factorial_out_of_bound
         jal PRINT_STRING
         move $a0, $t0
         jal PRINT_INT
         jal RESET
         jal new_line
-        eret
+        j END_PROGRAM
 
     ##### Reset function #####
     __END_FACTORIAL:
@@ -1342,8 +1319,8 @@ FACTORIAL: # nguyenpanda (function)(int = $a0) => $v0: int
         addi $sp, $sp, 8
     jr $ra          # Return FACTORIAL
 
-EXPONENTIATION: # nguyenpanda (leaf function)(double_1 = $f12, double_2 = $f14) => $f0: double
-    # EXPONENTIATION(double_1 = $f12, double_2 = $f14) => $f0: double
+EXPONENT: # nguyenpanda (leaf function)(double_1 = $f12, double_2 = $f14) => $f0: double
+    # EXPONENT(double_1 = $f12, double_2 = $f14) => $f0: double
     #   - Calculate the exponentiation of 2 numbers
     #   - The function floor $f14 to int
     # Parameters:
@@ -1352,7 +1329,7 @@ EXPONENTIATION: # nguyenpanda (leaf function)(double_1 = $f12, double_2 = $f14) 
     # Return:
     #   $f0: (First number ^ Second number)
     ##### Init function  #####
-        addi $sp, $sp, -8   # EXPONENTIATION: use 2 registers $t0, $t1
+        addi $sp, $sp, -8   # EXPONENT: use 2 registers $t0, $t1
         sw $t0, 0($sp)      # t0 = floor(f14)
         sw $t1, 4($sp)
     
@@ -1397,11 +1374,11 @@ EXPONENTIATION: # nguyenpanda (leaf function)(double_1 = $f12, double_2 = $f14) 
             lw $t0, 0($sp)
             lw $t1, 4($sp)
             addi $sp, $sp, 8
-    jr $ra  # Return EXPONENTIATION
+    jr $ra  # Return EXPONENT
 
 ### STRING AND DOUBLE MANIPULATOR
-STRING_LENGHT: # nguyenpanda (leaf function)(string = $a0) => $v0: unsighted int
-    # STRING_LENGHT(string = $a0) => $v0: unsighted int
+STRING_LENGTH: # nguyenpanda (leaf function)(string = $a0) => $v0: unsighted int
+    # STRING_LENGTH(string = $a0) => $v0: unsighted int
     #   - Get the lenght of a string
     #   - Cut off the new line character and null character
     # Parameters:
@@ -1409,27 +1386,27 @@ STRING_LENGHT: # nguyenpanda (leaf function)(string = $a0) => $v0: unsighted int
     # Return:
     #   $v0: Lenght of the string
     ##### Init function  #####
-        addi $sp, $sp, -8      # STRING_LENGHT: use 2 registers $t0, $t1
+        addi $sp, $sp, -8      # STRING_LENGTH: use 2 registers $t0, $t1
         sw $t1, 4($sp)
         sw $t0, 0($sp)
         li $v0, 0
         move $t1, $a0           # SUPPORT PASS BY REFERENCE
 
     ##### Main function  #####
-        __loop_STRING_LENGHT:
+        __loop_STRING_LENGTH:
             lb $t0, 0($t1)      # Load character from memory
-            beq $t0, $zero, __end_loop_STRING_LENGHT    # If character is null, end loop
-            beq $t0, 10, __end_loop_STRING_LENGHT       # If character is new line, end loop
+            beq $t0, $zero, __end_loop_STRING_LENGTH    # If character is null, end loop
+            beq $t0, 10, __end_loop_STRING_LENGTH       # If character is new line, end loop
             addi $t1, $t1, 1    # Move to next character
             addi $v0, $v0, 1    # Increment counter
-        j __loop_STRING_LENGHT
+        j __loop_STRING_LENGTH
 
     ##### Reset function #####
-        __end_loop_STRING_LENGHT:
+        __end_loop_STRING_LENGTH:
             lw $t1, 4($sp)
             lw $t0, 0($sp)
             addi $sp, $sp, 8
-    jr $ra  # Return STRING_LENGHT
+    jr $ra  # Return STRING_LENGTH
 
 COMPARE_STRING: # nguyenpanda (function)(str_0 = $a0, str_1 = $a1) => $v0: boolean
     # COMPARE_STRING(str_0 = $a0, str_1 = $a1) => $v0: boolean
@@ -1453,11 +1430,11 @@ COMPARE_STRING: # nguyenpanda (function)(str_0 = $a0, str_1 = $a1) => $v0: boole
         move $t2, $a1           # SUPPORT PASS BY REFERENCE
         
         move $a0, $t0
-        jal STRING_LENGHT
+        jal STRING_LENGTH
         addu $t1, $v0, $zero    # t1 = lenght(str_0)
 
         move $a0, $t2
-        jal STRING_LENGHT
+        jal STRING_LENGTH
         addu $t3, $v0, $zero    # t3 = lenght(str_1)
 
         li $v0, 0               # Assume that 2 strings are not the same
@@ -1554,7 +1531,7 @@ DOUBLE_TO_STRING: # nguyenpanda (function)(string_buffer = $a0, is_append_mode =
             j __next_init_DOUBLE_TO_STRING
         __adding_mode_DOUBLE_TO_STRING:
             # += mode
-            jal STRING_LENGHT
+            jal STRING_LENGTH
             add $t0, $t0, $v0
         __next_init_DOUBLE_TO_STRING:
         la $t1, temp_space
@@ -1819,7 +1796,7 @@ TYPE_QUIT: # nguyenpanda
 
 WRITE_TO_FILE: # nguyenpanda (function)(message = $a0, filename = $a1, mode = $a2) => void
     # WRITE_TO_FILE(message = $a0, filename = $a1, mode = $a2) => void
-    #   - Write a message to a file, without checking the length of the message
+    #   - Write a message to a file, this function will automatically check the length of the message
     # Parameters:
     #   $a0: Address of the message string
     #   $a1: Address of the filename string
@@ -1832,7 +1809,7 @@ WRITE_TO_FILE: # nguyenpanda (function)(message = $a0, filename = $a1, mode = $a
         sw $t1, 4($sp)
         sw $t0, 0($sp)
         move $t0, $a0       # message
-        jal STRING_LENGHT
+        jal STRING_LENGTH
         addi $t1, $v0, 1    # length of the message (including null character)
         move $t2, $a1       # filename
         move $t3, $a2       # mode
@@ -1938,3 +1915,21 @@ COLOR: # nguyenpanda
         li $v0, 4
         syscall
         jr $ra  # Return RESET
+
+TEST_PUSH:
+    la $a0, stack
+    li $a1, 'H'
+    jal STACK_PUSH
+    li $a1, 'C'
+    jal STACK_PUSH
+    li $a1, 'M'
+    jal STACK_PUSH
+    li $a1, 'U'
+    jal STACK_PUSH
+    li $a1, 'T'
+    jal STACK_PUSH
+
+    la $a1, PRINT_CHAR
+    jal PRINT_STACK
+
+    j END_PROGRAM
